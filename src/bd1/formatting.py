@@ -13,16 +13,8 @@ def format_duration(seconds: int) -> str:
 
 def format_daily_report(report: DailyReport) -> str:
     lines = [f"BD-1 daily report - {report.date}", ""]
-    lines.append("Observed timeline:")
-    if report.observations:
-        for observation in report.observations:
-            lines.append(f"- {_format_time(observation.observed_at)} {observation.type.value}")
-    else:
-        lines.append("- No observations")
-
-    lines.extend(["", "Suggested interpretation:"])
-    _append_blocks(lines, "Work", report.work_blocks)
-    _append_blocks(lines, "Break", report.break_blocks)
+    lines.append("Suggested interpretation:")
+    _append_timeline_blocks(lines, report.work_blocks, report.break_blocks)
     lines.extend(
         [
             "",
@@ -34,6 +26,13 @@ def format_daily_report(report: DailyReport) -> str:
     if report.anomalies:
         lines.extend(["", "Anomalies:"])
         lines.extend(f"- {anomaly}" for anomaly in report.anomalies)
+
+    lines.extend(["", "Observed timeline:"])
+    if report.observations:
+        for observation in report.observations:
+            lines.append(f"- {_format_time(observation.observed_at)} {observation.type.value}")
+    else:
+        lines.append("- No observations")
 
     return "\n".join(lines)
 
@@ -47,8 +46,7 @@ def format_weekly_report(report: WeeklyReport) -> str:
             continue
 
         lines.append(f"{day.date}: {format_duration(day.worked_seconds)} worked")
-        _append_blocks(lines, "Work", day.work_blocks, prefix="  ")
-        _append_blocks(lines, "Break", day.break_blocks, prefix="  ")
+        _append_timeline_blocks(lines, day.work_blocks, day.break_blocks, prefix="  ")
         for anomaly in day.anomalies:
             lines.append(f"  - {anomaly}")
         lines.append("")
@@ -56,16 +54,18 @@ def format_weekly_report(report: WeeklyReport) -> str:
     return "\n".join(lines)
 
 
-def _append_blocks(
+def _append_timeline_blocks(
     lines: list[str],
-    title: str,
-    blocks: tuple[TimeBlock, ...],
+    work_blocks: tuple[TimeBlock, ...],
+    break_blocks: tuple[TimeBlock, ...],
     prefix: str = "",
 ) -> None:
+    blocks = sorted((*work_blocks, *break_blocks), key=lambda block: (block.start, block.end))
     if not blocks:
-        lines.append(f"{prefix}- {title}: none")
+        lines.append(f"{prefix}- No interpreted blocks")
         return
     for block in blocks:
+        title = "Work" if block.label == "work" else "Break"
         lines.append(
             f"{prefix}- {title}: {_format_time(block.start)} -> {_format_time(block.end)} "
             f"({format_duration(block.seconds)})"
