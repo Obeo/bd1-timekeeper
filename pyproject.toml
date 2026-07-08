@@ -11,9 +11,17 @@ requires-python = ">=3.13"
 authors = [{ name = "BD-1 contributors" }]
 dependencies = [
     "platformdirs>=4.3",
+    "psutil>=6.1",
+]
+
+[project.optional-dependencies]
+desktop = [
     "pillow>=10.4",
     "pynput>=1.7",
     "pystray>=0.19",
+]
+dev = [
+    "ruff>=0.4.5",
 ]
 
 [project.scripts]
@@ -24,6 +32,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "bd1.assets.icons.hd" = ["*.png"]
+"bd1.assets.icons.head" = ["*.png"]
 
 [tool.ruff]
 line-length = 100

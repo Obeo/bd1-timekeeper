@@ -15,11 +15,13 @@ BREAK_START_EVENTS = {
     ObservationType.USER_BREAK,
 }
 DAY_END_EVENTS = {ObservationType.SHUTDOWN}
+LATE_APP_START_AFTER_BOOT_SECONDS = 60 * 60
 
 
 class ReportAnalyzer:
     def build_daily(self, day: date, observations: Iterable[Observation]) -> DailyReport:
         ordered = tuple(sorted(observations, key=lambda item: (item.observed_at, item.id or 0)))
+        interpreted = self._with_boot_as_work_start_when_app_started_late(ordered)
         work_blocks: list[TimeBlock] = []
         break_blocks: list[TimeBlock] = []
         anomalies: list[str] = []
@@ -27,9 +29,12 @@ class ReportAnalyzer:
         current_label: str | None = None
         current_start: datetime | None = None
 
-        for observation in ordered:
+        for observation in interpreted:
             next_label = self._label_for(observation.type)
             if next_label is None:
+                continue
+
+            if next_label == current_label:
                 continue
 
             if current_label is not None and current_start is not None:
@@ -80,6 +85,8 @@ class ReportAnalyzer:
 
     @staticmethod
     def _label_for(observation_type: ObservationType) -> str | None:
+        if observation_type == ObservationType.BOOT:
+            return "work"
         if observation_type in WORK_START_EVENTS:
             return "work"
         if observation_type in BREAK_START_EVENTS:
@@ -103,3 +110,59 @@ class ReportAnalyzer:
             work_blocks.append(block)
         elif label == "break":
             break_blocks.append(block)
+
+    @staticmethod
+    def _with_boot_as_work_start_when_app_started_late(
+        observations: tuple[Observation, ...],
+    ) -> tuple[Observation, ...]:
+        boot = next(
+            (
+                observation
+                for observation in observations
+                if observation.type == ObservationType.BOOT
+            ),
+            None,
+        )
+        app_started = next(
+            (
+                observation
+                for observation in observations
+                if observation.type == ObservationType.APP_STARTED
+            ),
+            None,
+        )
+        if boot is None or app_started is None:
+            return tuple(
+                observation
+                for observation in observations
+                if observation.type != ObservationType.BOOT
+            )
+
+        if app_started.observed_at <= boot.observed_at:
+            return tuple(
+                observation
+                for observation in observations
+                if observation.type != ObservationType.BOOT
+            )
+
+        gap_seconds = int((app_started.observed_at - boot.observed_at).total_seconds())
+        if gap_seconds < LATE_APP_START_AFTER_BOOT_SECONDS:
+            return tuple(
+                observation
+                for observation in observations
+                if observation.type != ObservationType.BOOT
+            )
+
+        has_work_signal_after_app_start = any(
+            observation.type in WORK_START_EVENTS
+            and observation.observed_at >= app_started.observed_at
+            for observation in observations
+        )
+        if not has_work_signal_after_app_start:
+            return tuple(
+                observation
+                for observation in observations
+                if observation.type != ObservationType.BOOT
+            )
+
+        return observations

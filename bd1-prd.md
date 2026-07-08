@@ -260,7 +260,7 @@ Elle n'est jamais enregistrée telle quelle en base.
 
 # 10. Détection des blocs
 
-Lorsqu'une période d'inactivité dépasse un seuil configurable (30 minutes par défaut), BD-1 crée un **bloc d'inactivité observé**.
+Lorsqu'une période d'inactivité dépasse un seuil configurable (16 minutes par défaut), BD-1 crée un **bloc d'inactivité observé**.
 
 Exemple :
 

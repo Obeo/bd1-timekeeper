@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 from datetime import date, datetime
+from importlib.util import find_spec
 
 from bd1.formatting import format_daily_report, format_weekly_report
 from bd1.models import ObservationType
@@ -17,7 +20,21 @@ def main() -> None:
         "--mark-working", action="store_true", help="Add a manual working observation."
     )
     parser.add_argument("--mark-break", action="store_true", help="Add a manual break observation.")
+    parser.add_argument(
+        "--diagnose-desktop",
+        action="store_true",
+        help="Print desktop/tray diagnostics and exit.",
+    )
+    parser.add_argument(
+        "--no-activity-monitor",
+        action="store_true",
+        help="Run the tray app without keyboard/mouse activity listeners.",
+    )
     args = parser.parse_args()
+
+    if args.diagnose_desktop:
+        print(_desktop_diagnostics())
+        return
 
     store = ObservationStore()
     try:
@@ -36,10 +53,31 @@ def main() -> None:
                 print(format_weekly_report(reports.weekly(target_date)))
             return
 
-        from bd1.app import BD1Application
-        from bd1.settings import load_settings
+        try:
+            from bd1.app import BD1Application
+            from bd1.settings import load_settings
+        except ModuleNotFoundError as error:
+            if error.name in {"PIL", "pynput", "pystray"}:
+                print(
+                    "BD-1 desktop dependencies are not installed. "
+                    'Run: python -m pip install -e ".[desktop]"',
+                    file=sys.stderr,
+                )
+                raise SystemExit(2) from error
+            if error.name == "tkinter":
+                print(
+                    "BD-1 needs tkinter for report windows. "
+                    "On openSUSE, install it with: sudo zypper install python313-tk",
+                    file=sys.stderr,
+                )
+                raise SystemExit(2) from error
+            raise
 
-        BD1Application(settings=load_settings(), store=store).run()
+        BD1Application(
+            settings=load_settings(),
+            store=store,
+            activity_monitor_enabled=not args.no_activity_monitor,
+        ).run()
     finally:
         store.close()
 
@@ -48,6 +86,24 @@ def _parse_date(value: str | None) -> date:
     if value is None:
         return date.today()
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def _desktop_diagnostics() -> str:
+    lines = ["BD-1 desktop diagnostics"]
+    for name in ("XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "DISPLAY", "WAYLAND_DISPLAY"):
+        lines.append(f"{name}: {os.environ.get(name, '<unset>')}")
+
+    for module in ("PIL", "pynput", "pystray", "tkinter"):
+        lines.append(f"{module}: {'available' if find_spec(module) else 'missing'}")
+
+    if find_spec("pystray"):
+        import pystray
+
+        lines.append(f"pystray backend: {pystray.Icon.__module__}")
+        lines.append(f"pystray HAS_MENU: {getattr(pystray.Icon, 'HAS_MENU', None)}")
+        lines.append(f"pystray HAS_NOTIFICATION: {getattr(pystray.Icon, 'HAS_NOTIFICATION', None)}")
+
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

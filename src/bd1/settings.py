@@ -9,10 +9,10 @@ from bd1.paths import settings_path
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-    idle_threshold_minutes: int = 30
+    idle_threshold_minutes: int = 16
     autostart_enabled: bool = False
     notifications_enabled: bool = True
-    icon_theme: str = "hd"
+    icon_theme: str = "head"
     activity_poll_seconds: float = 1.0
 
     @property

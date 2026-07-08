@@ -19,10 +19,10 @@ ObservationRecorder = Callable[[ObservationType, datetime | None, dict[str, obje
 
 
 class TrayIconName(StrEnum):
-    OFFLINE = "robot-sleep.png"
-    PC_ON = "robot-idle.png"
-    ACTIVE = "robot-active.png"
-    IDLE = "robot-pause.png"
+    OFFLINE = "sleep.png"
+    PC_ON = "idle.png"
+    ACTIVE = "active.png"
+    IDLE = "pause.png"
 
 
 class TrayApp:
