@@ -1,5 +1,9 @@
 # BD-1
 
+<p align="center">
+  <img src="icons/hd/robot-active.png" alt="BD-1 active desktop companion" width="180">
+</p>
+
 BD-1 is a local desktop companion that observes user activity and suggests a daily or
 weekly time report. It is not a clock-in system: it stores factual observations and
 recomputes suggestions on demand.
