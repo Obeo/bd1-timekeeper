@@ -4,8 +4,10 @@ import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from bd1.app import BD1Application
+from bd1.autostart import AutostartStatus
 from bd1.models import ObservationType
 from bd1.settings import Settings
 from bd1.storage import ObservationStore
@@ -37,6 +39,38 @@ class BD1ApplicationTest(unittest.TestCase):
         ]
         self.assertEqual(1, len(boots))
         self.assertEqual({"source": "system_boot"}, boots[0].metadata)
+
+    def test_toggle_autostart_updates_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                manager = FakeAutostartManager()
+                app = BD1Application(
+                    Settings(),
+                    store,
+                    activity_monitor_enabled=False,
+                    autostart_manager=manager,
+                )
+
+                with patch("bd1.app.save_settings"):
+                    self.assertTrue(app.toggle_autostart())
+                    self.assertTrue(app.settings.autostart_enabled)
+                    self.assertFalse(app.toggle_autostart())
+                    self.assertFalse(app.settings.autostart_enabled)
+            finally:
+                store.close()
+
+
+class FakeAutostartManager:
+    def __init__(self) -> None:
+        self.enabled = False
+
+    def is_enabled(self) -> bool:
+        return self.enabled
+
+    def set_enabled(self, enabled: bool) -> AutostartStatus:
+        self.enabled = enabled
+        return AutostartStatus(True, enabled, "fake")
 
 
 if __name__ == "__main__":

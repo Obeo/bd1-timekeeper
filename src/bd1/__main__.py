@@ -35,6 +35,13 @@ def main() -> None:
         action="store_true",
         help="Run the tray app without keyboard/mouse activity listeners.",
     )
+    parser.add_argument("--enable-autostart", action="store_true", help="Enable user autostart.")
+    parser.add_argument("--disable-autostart", action="store_true", help="Disable user autostart.")
+    parser.add_argument(
+        "--autostart-status",
+        action="store_true",
+        help="Print user autostart status and exit.",
+    )
     args = parser.parse_args()
 
     if args.diagnose_desktop:
@@ -42,6 +49,9 @@ def main() -> None:
         return
     if args.profile_runtime:
         print(_runtime_profile())
+        return
+    if args.enable_autostart or args.disable_autostart or args.autostart_status:
+        print(_handle_autostart_command(args))
         return
 
     store = ObservationStore()
@@ -125,6 +135,27 @@ def _runtime_profile() -> str:
     lines.append(f"vms_mb: {memory.vms / 1024 / 1024:.1f}")
     lines.append(f"threads: {process.num_threads()}")
     lines.append(f"cpu_percent: {process.cpu_percent(interval=0.1):.1f}")
+    return "\n".join(lines)
+
+
+def _handle_autostart_command(args: argparse.Namespace) -> str:
+    from bd1.autostart import AutostartManager
+
+    manager = AutostartManager()
+    if args.enable_autostart:
+        status = manager.enable()
+    elif args.disable_autostart:
+        status = manager.disable()
+    else:
+        status = manager.status()
+
+    enabled = "enabled" if status.enabled else "disabled"
+    supported = "supported" if status.supported else "unsupported"
+    lines = [f"Autostart: {enabled} ({supported})"]
+    if status.location is not None:
+        lines.append(f"Location: {status.location}")
+    if status.detail:
+        lines.append(f"Detail: {status.detail}")
     return "\n".join(lines)
 
 

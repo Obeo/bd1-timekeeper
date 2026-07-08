@@ -4,12 +4,14 @@ import atexit
 import signal
 import threading
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from bd1.autostart import AutostartManager
 from bd1.models import ObservationType
 from bd1.reports import ReportService
-from bd1.settings import Settings
+from bd1.settings import Settings, save_settings
 from bd1.state import StateMachine
 from bd1.storage import ObservationStore
 from bd1.system import system_boot_time
@@ -26,11 +28,13 @@ class BD1Application:
         store: ObservationStore,
         activity_monitor_enabled: bool = True,
         boot_time_provider: Callable[[], datetime] = system_boot_time,
+        autostart_manager: AutostartManager | None = None,
     ) -> None:
         self.settings = settings
         self.store = store
         self.activity_monitor_enabled = activity_monitor_enabled
         self.boot_time_provider = boot_time_provider
+        self.autostart_manager = autostart_manager or AutostartManager()
         self.state_machine = StateMachine()
         self.report_service = ReportService(store)
         self.tray: TrayApp | None = None
@@ -58,6 +62,8 @@ class BD1Application:
             store=self.store,
             report_service=self.report_service,
             add_observation=self.add_observation,
+            autostart_is_enabled=self.autostart_is_enabled,
+            toggle_autostart=self.toggle_autostart,
             stop_callback=self.stop,
         )
         if self.activity_monitor is not None:
@@ -95,6 +101,16 @@ class BD1Application:
         state = self.state_machine.record(observation.type)
         if self.tray is not None:
             self.tray.set_state(state)
+
+    def autostart_is_enabled(self) -> bool:
+        return self.autostart_manager.is_enabled()
+
+    def toggle_autostart(self) -> bool:
+        enabled = not self.autostart_manager.is_enabled()
+        status = self.autostart_manager.set_enabled(enabled)
+        self.settings = replace(self.settings, autostart_enabled=status.enabled)
+        save_settings(self.settings)
+        return status.enabled
 
     def _record_app_stopped(self) -> None:
         try:

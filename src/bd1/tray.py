@@ -30,11 +30,15 @@ class TrayApp:
         store: ObservationStore,
         report_service: ReportService,
         add_observation: ObservationRecorder,
+        autostart_is_enabled: Callable[[], bool],
+        toggle_autostart: Callable[[], bool],
         stop_callback: Callable[[], None],
     ) -> None:
         self.store = store
         self.report_service = report_service
         self.add_observation = add_observation
+        self.autostart_is_enabled = autostart_is_enabled
+        self.toggle_autostart = toggle_autostart
         self.stop_callback = stop_callback
         self.state = RuntimeState.PC_ON
         self.icon = pystray.Icon("BD-1", self._load_image(self.state), "BD-1", self._menu())
@@ -75,8 +79,18 @@ class TrayApp:
             pystray.MenuItem("Rapport du jour", lambda *_: self._show_daily_report()),
             pystray.MenuItem("Rapport de la semaine", lambda *_: self._show_weekly_report()),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
+                "Lancer au demarrage",
+                lambda *_: self._toggle_autostart(),
+                checked=lambda _: self.autostart_is_enabled(),
+            ),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quitter", lambda *_: self.stop_callback()),
         )
+
+    def _toggle_autostart(self) -> None:
+        self.toggle_autostart()
+        self.icon.update_menu()
 
     def _show_daily_report(self) -> None:
         self._show_text_window(

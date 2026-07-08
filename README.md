@@ -42,6 +42,9 @@ bd1 --mark-break
 bd1 --diagnose-desktop
 bd1 --profile-runtime
 bd1 --no-activity-monitor
+bd1 --enable-autostart
+bd1 --disable-autostart
+bd1 --autostart-status
 python -m unittest discover -s tests
 ```
 
