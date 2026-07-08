@@ -41,20 +41,33 @@ def format_daily_report(report: DailyReport) -> str:
 def format_weekly_report(report: WeeklyReport) -> str:
     lines = [f"BD-1 weekly report - week of {report.week_start}", ""]
     for day in report.days:
+        if not day.observations:
+            lines.append(f"{day.date}: no observations")
+            lines.append("")
+            continue
+
         lines.append(f"{day.date}: {format_duration(day.worked_seconds)} worked")
+        _append_blocks(lines, "Work", day.work_blocks, prefix="  ")
+        _append_blocks(lines, "Break", day.break_blocks, prefix="  ")
         for anomaly in day.anomalies:
             lines.append(f"  - {anomaly}")
-    lines.extend(["", f"Weekly total: {format_duration(report.worked_seconds)}"])
+        lines.append("")
+    lines.append(f"Weekly total: {format_duration(report.worked_seconds)}")
     return "\n".join(lines)
 
 
-def _append_blocks(lines: list[str], title: str, blocks: tuple[TimeBlock, ...]) -> None:
+def _append_blocks(
+    lines: list[str],
+    title: str,
+    blocks: tuple[TimeBlock, ...],
+    prefix: str = "",
+) -> None:
     if not blocks:
-        lines.append(f"- {title}: none")
+        lines.append(f"{prefix}- {title}: none")
         return
     for block in blocks:
         lines.append(
-            f"- {title}: {_format_time(block.start)} -> {_format_time(block.end)} "
+            f"{prefix}- {title}: {_format_time(block.start)} -> {_format_time(block.end)} "
             f"({format_duration(block.seconds)})"
         )
 

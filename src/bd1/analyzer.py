@@ -10,12 +10,19 @@ WORK_START_EVENTS = {
     ObservationType.ACTIVITY_RESUMED,
     ObservationType.USER_WORKING,
 }
+AUTOMATIC_WORK_START_EVENTS = {
+    ObservationType.FIRST_ACTIVITY,
+    ObservationType.ACTIVITY_RESUMED,
+}
 BREAK_START_EVENTS = {
     ObservationType.IDLE_STARTED,
     ObservationType.USER_BREAK,
 }
 DAY_END_EVENTS = {ObservationType.SHUTDOWN}
 LATE_APP_START_AFTER_BOOT_SECONDS = 60 * 60
+SHORT_AUTOMATIC_RESUME_SECONDS = 5 * 60
+LUNCH_START = time(12, 0)
+LUNCH_AUTOMATIC_WORK_RESUME = time(13, 58)
 
 
 class ReportAnalyzer:
@@ -28,14 +35,54 @@ class ReportAnalyzer:
 
         current_label: str | None = None
         current_start: datetime | None = None
+        pending_lunch_work_start: datetime | None = None
 
-        for observation in interpreted:
+        for index, observation in enumerate(interpreted):
+            if (
+                pending_lunch_work_start is not None
+                and observation.observed_at >= pending_lunch_work_start
+                and current_label == "break"
+                and current_start is not None
+            ):
+                self._append_block(
+                    current_label,
+                    current_start,
+                    pending_lunch_work_start,
+                    work_blocks,
+                    break_blocks,
+                )
+                current_label = "work"
+                current_start = pending_lunch_work_start
+                pending_lunch_work_start = None
+
             next_label = self._label_for(observation.type)
             if next_label is None:
                 continue
 
+            if (
+                current_label == "break"
+                and observation.type in AUTOMATIC_WORK_START_EVENTS
+                and self._is_short_automatic_resume(interpreted, index)
+            ):
+                continue
+
+            if (
+                current_label == "break"
+                and observation.type in AUTOMATIC_WORK_START_EVENTS
+                and self._is_protected_lunch_resume(observation.observed_at)
+            ):
+                pending_lunch_work_start = self._lunch_automatic_work_resume_at(
+                    observation.observed_at
+                )
+                continue
+
+            if observation.type == ObservationType.USER_BREAK:
+                pending_lunch_work_start = None
+
             if next_label == current_label:
                 continue
+
+            pending_lunch_work_start = None
 
             if current_label is not None and current_start is not None:
                 self._append_block(
@@ -52,10 +99,38 @@ class ReportAnalyzer:
         if current_label is not None and current_start is not None:
             end_of_day = datetime.combine(day + timedelta(days=1), time.min).astimezone()
             now = datetime.now().astimezone()
+            app_stopped_at = self._last_app_stopped_at(ordered)
+            if app_stopped_at is not None and app_stopped_at > current_start:
+                effective_end = min(end_of_day, app_stopped_at)
+                anomalies.append(
+                    "Application stopped before a system shutdown was observed; "
+                    "using it as the estimated day end."
+                )
+            else:
+                effective_end = min(end_of_day, now)
+                anomalies.append("No shutdown observation after the last active segment.")
+
+            if (
+                pending_lunch_work_start is not None
+                and current_label == "break"
+                and pending_lunch_work_start < effective_end
+            ):
+                self._append_block(
+                    current_label,
+                    current_start,
+                    pending_lunch_work_start,
+                    work_blocks,
+                    break_blocks,
+                )
+                current_label = "work"
+                current_start = pending_lunch_work_start
             self._append_block(
-                current_label, current_start, min(end_of_day, now), work_blocks, break_blocks
+                current_label,
+                current_start,
+                effective_end,
+                work_blocks,
+                break_blocks,
             )
-            anomalies.append("No shutdown observation after the last active segment.")
 
         if not any(observation.type in WORK_START_EVENTS for observation in ordered):
             anomalies.append("No user activity detected for this day.")
@@ -110,6 +185,45 @@ class ReportAnalyzer:
             work_blocks.append(block)
         elif label == "break":
             break_blocks.append(block)
+
+    @staticmethod
+    def _is_protected_lunch_resume(observed_at: datetime) -> bool:
+        return LUNCH_START <= observed_at.time() < LUNCH_AUTOMATIC_WORK_RESUME
+
+    @staticmethod
+    def _lunch_automatic_work_resume_at(observed_at: datetime) -> datetime:
+        return observed_at.replace(
+            hour=LUNCH_AUTOMATIC_WORK_RESUME.hour,
+            minute=LUNCH_AUTOMATIC_WORK_RESUME.minute,
+            second=0,
+            microsecond=0,
+        )
+
+    @staticmethod
+    def _last_app_stopped_at(observations: tuple[Observation, ...]) -> datetime | None:
+        if not observations or observations[-1].type != ObservationType.APP_STOPPED:
+            return None
+        return observations[-1].observed_at
+
+    @staticmethod
+    def _is_short_automatic_resume(
+        observations: tuple[Observation, ...],
+        index: int,
+    ) -> bool:
+        observation = observations[index]
+        next_break = next(
+            (
+                candidate
+                for candidate in observations[index + 1 :]
+                if candidate.type in BREAK_START_EVENTS
+            ),
+            None,
+        )
+        if next_break is None:
+            return False
+
+        resume_seconds = int((next_break.observed_at - observation.observed_at).total_seconds())
+        return 0 <= resume_seconds <= SHORT_AUTOMATIC_RESUME_SECONDS
 
     @staticmethod
     def _with_boot_as_work_start_when_app_started_late(

@@ -24,8 +24,8 @@ class ReportAnalyzerTest(unittest.TestCase):
 
         self.assertEqual(2, len(report.work_blocks))
         self.assertEqual(1, len(report.break_blocks))
-        self.assertEqual(8 * 3600 + 4 * 60, report.worked_seconds)
-        self.assertEqual(89 * 60, report.break_seconds)
+        self.assertEqual(7 * 3600 + 43 * 60, report.worked_seconds)
+        self.assertEqual(110 * 60, report.break_seconds)
         self.assertEqual((), report.anomalies)
 
     def test_manual_marks_are_strong_signals(self) -> None:
@@ -58,6 +58,99 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("09:00", report.work_blocks[0].start.strftime("%H:%M"))
         self.assertEqual("12:00", report.work_blocks[0].end.strftime("%H:%M"))
 
+    def test_automatic_lunch_resume_before_1358_keeps_break_until_1358(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:08:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T13:20:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual("12:08", report.break_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("13:58", report.break_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("13:58", report.work_blocks[1].start.strftime("%H:%M"))
+
+    def test_explicit_lunch_working_mark_starts_work_immediately(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:08:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T13:20:00+02:00", ObservationType.USER_WORKING),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual("13:20", report.break_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("13:20", report.work_blocks[1].start.strftime("%H:%M"))
+
+    def test_automatic_lunch_resume_at_1358_starts_work(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:08:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T13:58:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual("13:58", report.break_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("13:58", report.work_blocks[1].start.strftime("%H:%M"))
+
+    def test_short_automatic_resume_keeps_break_continuous(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:00:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T14:05:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T14:08:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T15:00:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T17:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual(2, len(report.work_blocks))
+        self.assertEqual(1, len(report.break_blocks))
+        self.assertEqual("12:00", report.break_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("15:00", report.break_blocks[0].end.strftime("%H:%M"))
+
+    def test_explicit_working_mark_keeps_short_resume_as_work(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:00:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T14:05:00+02:00", ObservationType.USER_WORKING),
+            obs("2026-07-08T14:08:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T15:00:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T17:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual("14:05", report.work_blocks[1].start.strftime("%H:%M"))
+        self.assertEqual("14:08", report.work_blocks[1].end.strftime("%H:%M"))
+
+    def test_long_automatic_resume_splits_break(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:00:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T14:05:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T14:12:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T15:00:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T17:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual("14:05", report.work_blocks[1].start.strftime("%H:%M"))
+        self.assertEqual("14:12", report.work_blocks[1].end.strftime("%H:%M"))
+
     def test_app_lifecycle_events_do_not_affect_work_time(self) -> None:
         day = date(2026, 7, 8)
         observations = [
@@ -71,6 +164,37 @@ class ReportAnalyzerTest(unittest.TestCase):
 
         self.assertEqual(8 * 3600, report.worked_seconds)
         self.assertEqual(0, report.break_seconds)
+
+    def test_last_app_stopped_closes_open_work_block_qualitatively(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T18:03:00+02:00", ObservationType.APP_STOPPED),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual(1, len(report.work_blocks))
+        self.assertEqual("18:03", report.work_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual(9 * 3600 + 3 * 60, report.worked_seconds)
+        self.assertIn(
+            "Application stopped before a system shutdown was observed; "
+            "using it as the estimated day end.",
+            report.anomalies,
+        )
+        self.assertNotIn("No shutdown observation after the last active segment.", report.anomalies)
+
+    def test_non_last_app_stopped_does_not_close_work_block(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:00:00+02:00", ObservationType.APP_STOPPED),
+            obs("2026-07-08T17:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual(8 * 3600, report.worked_seconds)
 
     def test_late_app_start_interprets_boot_as_work_start(self) -> None:
         day = date(2026, 7, 8)
