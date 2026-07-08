@@ -22,6 +22,7 @@ DAY_END_EVENTS = {ObservationType.SHUTDOWN}
 LATE_APP_START_AFTER_BOOT_SECONDS = 60 * 60
 SHORT_AUTOMATIC_RESUME_SECONDS = 5 * 60
 LUNCH_START = time(12, 0)
+LUNCH_END = time(14, 0)
 LUNCH_AUTOMATIC_WORK_RESUME = time(13, 58)
 
 
@@ -279,4 +280,62 @@ class ReportAnalyzer:
                 if observation.type != ObservationType.BOOT
             )
 
+        if ReportAnalyzer._should_insert_default_lunch_break(boot, app_started, observations):
+            return tuple(
+                sorted(
+                    (
+                        *observations,
+                        Observation(
+                            observed_at=boot.observed_at.replace(
+                                hour=LUNCH_START.hour,
+                                minute=LUNCH_START.minute,
+                                second=0,
+                                microsecond=0,
+                            ),
+                            type=ObservationType.USER_BREAK,
+                            metadata={"source": "inferred_late_app_start_lunch"},
+                        ),
+                        Observation(
+                            observed_at=boot.observed_at.replace(
+                                hour=LUNCH_END.hour,
+                                minute=LUNCH_END.minute,
+                                second=0,
+                                microsecond=0,
+                            ),
+                            type=ObservationType.ACTIVITY_RESUMED,
+                            metadata={"source": "inferred_late_app_start_lunch"},
+                        ),
+                    ),
+                    key=lambda item: (item.observed_at, item.id or 0),
+                )
+            )
+
         return observations
+
+    @staticmethod
+    def _should_insert_default_lunch_break(
+        boot: Observation,
+        app_started: Observation,
+        observations: tuple[Observation, ...],
+    ) -> bool:
+        lunch_start = boot.observed_at.replace(
+            hour=LUNCH_START.hour,
+            minute=LUNCH_START.minute,
+            second=0,
+            microsecond=0,
+        )
+        lunch_end = boot.observed_at.replace(
+            hour=LUNCH_END.hour,
+            minute=LUNCH_END.minute,
+            second=0,
+            microsecond=0,
+        )
+
+        if not (boot.observed_at < lunch_start and app_started.observed_at >= lunch_end):
+            return False
+
+        return not any(
+            observation.type not in {ObservationType.BOOT, ObservationType.APP_STARTED}
+            and lunch_start <= observation.observed_at < lunch_end
+            for observation in observations
+        )

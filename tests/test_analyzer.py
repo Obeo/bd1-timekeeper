@@ -210,6 +210,41 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual(9 * 3600, report.worked_seconds)
         self.assertEqual("08:00", report.work_blocks[0].start.strftime("%H:%M"))
 
+    def test_late_afternoon_app_start_infers_default_lunch_break(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T08:00:00+02:00", ObservationType.BOOT),
+            obs("2026-07-08T15:00:00+02:00", ObservationType.APP_STARTED),
+            obs("2026-07-08T15:02:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual(8 * 3600, report.worked_seconds)
+        self.assertEqual(2 * 3600, report.break_seconds)
+        self.assertEqual("08:00", report.work_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("12:00", report.work_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("12:00", report.break_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("14:00", report.break_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("14:00", report.work_blocks[1].start.strftime("%H:%M"))
+
+    def test_late_app_start_keeps_real_lunch_information(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T08:00:00+02:00", ObservationType.BOOT),
+            obs("2026-07-08T12:30:00+02:00", ObservationType.USER_BREAK),
+            obs("2026-07-08T15:00:00+02:00", ObservationType.APP_STARTED),
+            obs("2026-07-08T15:02:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual(1, len(report.break_blocks))
+        self.assertEqual("12:30", report.break_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("15:02", report.break_blocks[0].end.strftime("%H:%M"))
+
     def test_near_app_start_does_not_interpret_boot_as_work_start(self) -> None:
         day = date(2026, 7, 8)
         observations = [
