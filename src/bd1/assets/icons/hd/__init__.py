@@ -1,0 +1,1 @@
+"""High-density tray icons."""

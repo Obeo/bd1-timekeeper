@@ -1,0 +1,1 @@
+"""Packaged icon assets."""

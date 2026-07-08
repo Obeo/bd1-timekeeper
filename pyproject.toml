@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bd1"
+version = "0.1.0"
+description = "Local desktop companion that suggests worked time from activity observations."
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [{ name = "BD-1 contributors" }]
+dependencies = [
+    "platformdirs>=4.3",
+    "pillow>=10.4",
+    "pynput>=1.7",
+    "pystray>=0.19",
+]
+
+[project.scripts]
+bd1 = "bd1.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"bd1.assets.icons.hd" = ["*.png"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
