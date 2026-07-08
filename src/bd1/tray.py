@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import threading
-import tkinter as tk
 from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
@@ -96,6 +95,8 @@ class TrayApp:
 
     @staticmethod
     def _open_text_window(title: str, content: str) -> None:
+        import tkinter as tk
+
         root = tk.Tk()
         root.title(title)
         root.geometry("760x520")

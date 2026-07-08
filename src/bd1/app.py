@@ -41,6 +41,7 @@ class BD1Application:
             self.activity_monitor = ActivityMonitor(
                 idle_threshold_seconds=settings.idle_threshold_seconds,
                 callback=self.add_observation,
+                poll_seconds=settings.activity_poll_seconds,
             )
         self._stopping = False
         self._stop_lock = threading.Lock()

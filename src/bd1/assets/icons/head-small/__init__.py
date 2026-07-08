@@ -1,0 +1,1 @@
+"""Small head tray icons."""

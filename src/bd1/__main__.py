@@ -26,6 +26,11 @@ def main() -> None:
         help="Print desktop/tray diagnostics and exit.",
     )
     parser.add_argument(
+        "--profile-runtime",
+        action="store_true",
+        help="Print lightweight process resource diagnostics and exit.",
+    )
+    parser.add_argument(
         "--no-activity-monitor",
         action="store_true",
         help="Run the tray app without keyboard/mouse activity listeners.",
@@ -34,6 +39,9 @@ def main() -> None:
 
     if args.diagnose_desktop:
         print(_desktop_diagnostics())
+        return
+    if args.profile_runtime:
+        print(_runtime_profile())
         return
 
     store = ObservationStore()
@@ -103,6 +111,20 @@ def _desktop_diagnostics() -> str:
         lines.append(f"pystray HAS_MENU: {getattr(pystray.Icon, 'HAS_MENU', None)}")
         lines.append(f"pystray HAS_NOTIFICATION: {getattr(pystray.Icon, 'HAS_NOTIFICATION', None)}")
 
+    return "\n".join(lines)
+
+
+def _runtime_profile() -> str:
+    import psutil
+
+    process = psutil.Process()
+    memory = process.memory_info()
+    lines = ["BD-1 runtime profile"]
+    lines.append(f"pid: {process.pid}")
+    lines.append(f"rss_mb: {memory.rss / 1024 / 1024:.1f}")
+    lines.append(f"vms_mb: {memory.vms / 1024 / 1024:.1f}")
+    lines.append(f"threads: {process.num_threads()}")
+    lines.append(f"cpu_percent: {process.cpu_percent(interval=0.1):.1f}")
     return "\n".join(lines)
 
 

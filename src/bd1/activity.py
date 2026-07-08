@@ -23,8 +23,14 @@ class ActivityEvent:
 
 
 class ActivityMonitor:
-    def __init__(self, idle_threshold_seconds: int, callback: ObservationCallback) -> None:
+    def __init__(
+        self,
+        idle_threshold_seconds: int,
+        callback: ObservationCallback,
+        poll_seconds: float = 10.0,
+    ) -> None:
         self.idle_threshold_seconds = idle_threshold_seconds
+        self.poll_seconds = poll_seconds
         self.callback = callback
         self._last_activity_monotonic = time.monotonic()
         self._last_activity_at = datetime.now().astimezone()
@@ -73,7 +79,7 @@ class ActivityMonitor:
             return
 
     def _watch_idle(self) -> None:
-        while not self._stop_event.wait(1.0):
+        while not self._stop_event.wait(self.poll_seconds):
             idle_started_at: datetime | None = None
             idle_seconds = 0.0
 

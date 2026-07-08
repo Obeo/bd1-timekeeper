@@ -40,6 +40,7 @@ bd1 --report week
 bd1 --mark-working
 bd1 --mark-break
 bd1 --diagnose-desktop
+bd1 --profile-runtime
 bd1 --no-activity-monitor
 python -m unittest discover -s tests
 ```

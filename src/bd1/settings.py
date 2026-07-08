@@ -12,8 +12,8 @@ class Settings:
     idle_threshold_minutes: int = 16
     autostart_enabled: bool = False
     notifications_enabled: bool = True
-    icon_theme: str = "head"
-    activity_poll_seconds: float = 1.0
+    icon_theme: str = "head-small"
+    activity_poll_seconds: float = 10.0
 
     @property
     def idle_threshold_seconds(self) -> int:

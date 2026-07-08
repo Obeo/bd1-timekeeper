@@ -33,6 +33,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 "bd1.assets.icons.hd" = ["*.png"]
 "bd1.assets.icons.head" = ["*.png"]
+"bd1.assets.icons.head-small" = ["*.png"]
 
 [tool.ruff]
 line-length = 100

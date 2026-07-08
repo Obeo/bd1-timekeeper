@@ -23,4 +23,4 @@ def settings_path() -> Path:
 
 
 def icon_dir() -> Path:
-    return Path(__file__).resolve().parent / "assets" / "icons" / "head"
+    return Path(__file__).resolve().parent / "assets" / "icons" / "head-small"
