@@ -1,0 +1,112 @@
+name: Build executables
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: bd1-linux-x86_64
+            pyinstaller_hidden_imports: >-
+              --hidden-import pystray._xorg
+              --hidden-import pynput.keyboard._xorg
+              --hidden-import pynput.mouse._xorg
+          - os: windows-latest
+            artifact_name: bd1-windows-x86_64
+            pyinstaller_hidden_imports: >-
+              --hidden-import pystray._win32
+              --hidden-import pynput.keyboard._win32
+              --hidden-import pynput.mouse._win32
+          - os: macos-latest
+            artifact_name: bd1-macos-arm64
+            pyinstaller_hidden_imports: >-
+              --hidden-import pystray._darwin
+              --hidden-import pynput.keyboard._darwin
+              --hidden-import pynput.mouse._darwin
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install Linux build libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libx11-dev libxtst-dev libxi-dev
+
+      - name: Install Python dependencies
+        run: python -m pip install -U pip && python -m pip install ".[desktop,build,dev]"
+
+      - name: Run checks
+        run: |
+          ruff check .
+          ruff format --check .
+          python -m unittest discover -s tests -v
+
+      - name: Build with PyInstaller
+        shell: bash
+        env:
+          PYSTRAY_BACKEND: dummy
+        run: |
+          python -m PyInstaller \
+            --noconfirm \
+            --clean \
+            --windowed \
+            --name BD-1 \
+            --collect-data bd1 \
+            ${{ matrix.pyinstaller_hidden_imports }} \
+            scripts/bd1_entry.py
+
+      - name: Package Linux bundle
+        if: runner.os == 'Linux'
+        shell: bash
+        run: tar -C dist -czf "${{ matrix.artifact_name }}.tar.gz" BD-1
+
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: ditto -c -k --sequesterRsrc --keepParent "dist/BD-1.app" "${{ matrix.artifact_name }}.zip"
+
+      - name: Package Windows app
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/BD-1 -DestinationPath "${{ matrix.artifact_name }}.zip"
+
+      - name: Upload Linux artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.tar.gz
+          if-no-files-found: error
+
+      - name: Upload macOS artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.zip
+          if-no-files-found: error
+
+      - name: Upload Windows artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.zip
+          if-no-files-found: error

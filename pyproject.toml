@@ -23,6 +23,9 @@ desktop = [
 dev = [
     "ruff>=0.4.5",
 ]
+build = [
+    "pyinstaller>=6.11",
+]
 
 [project.scripts]
 bd1 = "bd1.__main__:main"
