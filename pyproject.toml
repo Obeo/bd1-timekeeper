@@ -12,6 +12,7 @@ authors = [{ name = "BD-1 contributors" }]
 dependencies = [
     "platformdirs>=4.3",
     "psutil>=6.1",
+    "tzdata>=2025.2",
 ]
 
 [project.optional-dependencies]
