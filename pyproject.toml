@@ -20,6 +20,7 @@ desktop = [
     "pillow>=10.4",
     "pynput>=1.7",
     "pystray>=0.19",
+    "six>=1.17",
 ]
 dev = [
     "ruff>=0.4.5",

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import sysconfig
 from datetime import date, datetime
 from importlib.util import find_spec
 
@@ -72,6 +73,7 @@ def main() -> None:
             return
 
         try:
+            _configure_tray_backend()
             from bd1.app import BD1Application
             from bd1.settings import load_settings
         except ModuleNotFoundError as error:
@@ -86,6 +88,15 @@ def main() -> None:
                 print(
                     "BD-1 needs tkinter for report windows. "
                     "On openSUSE, install it with: sudo zypper install python313-tk",
+                    file=sys.stderr,
+                )
+                raise SystemExit(2) from error
+            raise
+        except ImportError as error:
+            if "this platform is not supported" in str(error):
+                print(
+                    "BD-1 could not initialize a system tray backend. "
+                    'Run: python -m pip install -e ".[desktop]" and then bd1 --diagnose-desktop',
                     file=sys.stderr,
                 )
                 raise SystemExit(2) from error
@@ -107,6 +118,7 @@ def _parse_date(value: str | None) -> date:
 
 
 def _desktop_diagnostics() -> str:
+    _configure_tray_backend()
     lines = ["BD-1 desktop diagnostics"]
     for name in ("XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "DISPLAY", "WAYLAND_DISPLAY"):
         lines.append(f"{name}: {os.environ.get(name, '<unset>')}")
@@ -115,13 +127,49 @@ def _desktop_diagnostics() -> str:
         lines.append(f"{module}: {'available' if find_spec(module) else 'missing'}")
 
     if find_spec("pystray"):
-        import pystray
-
-        lines.append(f"pystray backend: {pystray.Icon.__module__}")
-        lines.append(f"pystray HAS_MENU: {getattr(pystray.Icon, 'HAS_MENU', None)}")
-        lines.append(f"pystray HAS_NOTIFICATION: {getattr(pystray.Icon, 'HAS_NOTIFICATION', None)}")
+        try:
+            import pystray
+        except ImportError as error:
+            lines.append(f"pystray backend: unavailable ({error})")
+        else:
+            lines.append(f"pystray backend: {pystray.Icon.__module__}")
+            lines.append(f"pystray HAS_MENU: {getattr(pystray.Icon, 'HAS_MENU', None)}")
+            lines.append(
+                f"pystray HAS_NOTIFICATION: {getattr(pystray.Icon, 'HAS_NOTIFICATION', None)}"
+            )
 
     return "\n".join(lines)
+
+
+def _configure_tray_backend() -> None:
+    if not sys.platform.startswith("linux") or os.environ.get("PYSTRAY_BACKEND"):
+        return
+
+    _add_system_site_packages()
+    if _has_appindicator_backend():
+        os.environ["PYSTRAY_BACKEND"] = "appindicator"
+    elif os.environ.get("DISPLAY"):
+        os.environ["PYSTRAY_BACKEND"] = "xorg"
+
+
+def _add_system_site_packages() -> None:
+    for key in ("platlib", "purelib"):
+        path = sysconfig.get_path(key, vars={"base": "/usr", "platbase": "/usr"})
+        if path and path not in sys.path:
+            sys.path.append(path)
+
+
+def _has_appindicator_backend() -> bool:
+    if find_spec("gi") is None:
+        return False
+    try:
+        import gi
+
+        gi.require_version("AyatanaAppIndicator3", "0.1")
+        from gi.repository import AyatanaAppIndicator3  # noqa: F401
+    except (ImportError, ValueError):
+        return False
+    return True
 
 
 def _runtime_profile() -> str:
