@@ -120,6 +120,29 @@ class FormattingTest(unittest.TestCase):
             rendered.index("- Work: 13:51 -> 18:00"),
         )
 
+    def test_daily_report_hides_heartbeat_observations(self) -> None:
+        report = DailyReport(
+            date="2026-07-08",
+            observations=(
+                Observation(
+                    datetime.fromisoformat("2026-07-08T09:07:00+02:00"),
+                    ObservationType.FIRST_ACTIVITY,
+                ),
+                Observation(
+                    datetime.fromisoformat("2026-07-08T18:05:00+02:00"),
+                    ObservationType.APP_HEARTBEAT,
+                ),
+            ),
+            work_blocks=(),
+            break_blocks=(),
+            anomalies=(),
+        )
+
+        rendered = format_daily_report(report)
+
+        self.assertIn("- 09:07 FIRST_ACTIVITY", rendered)
+        self.assertNotIn("APP_HEARTBEAT", rendered)
+
     def test_weekly_report_says_when_day_has_no_observations(self) -> None:
         day = DailyReport(
             date="2026-07-08",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import date, datetime, time, timedelta
 
 from bd1.models import DailyReport, Observation, ObservationType, TimeBlock, WeeklyReport
@@ -27,6 +27,9 @@ LUNCH_AUTOMATIC_WORK_RESUME = time(13, 58)
 
 
 class ReportAnalyzer:
+    def __init__(self, now_provider: Callable[[], datetime] | None = None) -> None:
+        self._now_provider = now_provider or (lambda: datetime.now().astimezone())
+
     def build_daily(self, day: date, observations: Iterable[Observation]) -> DailyReport:
         ordered = tuple(sorted(observations, key=lambda item: (item.observed_at, item.id or 0)))
         interpreted = self._with_boot_as_work_start_when_app_started_late(ordered)
@@ -99,13 +102,22 @@ class ReportAnalyzer:
 
         if current_label is not None and current_start is not None:
             end_of_day = datetime.combine(day + timedelta(days=1), time.min).astimezone()
-            now = datetime.now().astimezone()
+            now = self._now_provider()
             app_stopped_at = self._last_app_stopped_at(ordered)
             if app_stopped_at is not None and app_stopped_at > current_start:
                 effective_end = min(end_of_day, app_stopped_at)
                 anomalies.append(
                     "Application stopped before a system shutdown was observed; "
                     "using it as the estimated day end."
+                )
+            elif day < now.date():
+                effective_end = self._last_known_end_for_closed_day(
+                    interpreted,
+                    pending_lunch_work_start,
+                )
+                anomalies.append(
+                    "No shutdown observation after the last active segment; "
+                    "stopping the past-day estimate at the last known observation."
                 )
             else:
                 effective_end = min(end_of_day, now)
@@ -205,6 +217,16 @@ class ReportAnalyzer:
         if not observations or observations[-1].type != ObservationType.APP_STOPPED:
             return None
         return observations[-1].observed_at
+
+    @staticmethod
+    def _last_known_end_for_closed_day(
+        observations: tuple[Observation, ...],
+        pending_lunch_work_start: datetime | None,
+    ) -> datetime:
+        known_end = observations[-1].observed_at
+        if pending_lunch_work_start is not None and pending_lunch_work_start > known_end:
+            return pending_lunch_work_start
+        return known_end
 
     @staticmethod
     def _is_short_automatic_resume(

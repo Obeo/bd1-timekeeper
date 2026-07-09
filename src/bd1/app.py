@@ -50,6 +50,8 @@ class BD1Application:
         self._stopping = False
         self._stop_lock = threading.Lock()
         self._shutdown_requested = threading.Event()
+        self._heartbeat_stop = threading.Event()
+        self._heartbeat_thread: threading.Thread | None = None
 
     def run(self) -> None:
         atexit.register(self._record_app_stopped)
@@ -68,6 +70,7 @@ class BD1Application:
         )
         if self.activity_monitor is not None:
             self.activity_monitor.start()
+        self._start_heartbeat()
         self._start_signal_watcher()
         try:
             self.tray.run()
@@ -82,6 +85,7 @@ class BD1Application:
 
         if self.activity_monitor is not None:
             self.activity_monitor.stop()
+        self._stop_heartbeat()
         self._record_app_stopped()
         if self.tray is not None:
             self.tray.stop()
@@ -117,6 +121,26 @@ class BD1Application:
             self.store.add(ObservationType.APP_STOPPED, metadata={"source": "app"})
         except RuntimeError:
             return
+
+    def _start_heartbeat(self) -> None:
+        self._heartbeat_thread = threading.Thread(target=self._record_heartbeats, daemon=True)
+        self._heartbeat_thread.start()
+
+    def _stop_heartbeat(self) -> None:
+        self._heartbeat_stop.set()
+        if self._heartbeat_thread is not None:
+            self._heartbeat_thread.join(timeout=2)
+
+    def _record_heartbeats(self) -> None:
+        interval = max(1.0, self.settings.heartbeat_interval_seconds)
+        while not self._heartbeat_stop.wait(interval):
+            try:
+                self.store.add(
+                    ObservationType.APP_HEARTBEAT,
+                    metadata={"source": "app"},
+                )
+            except RuntimeError:
+                return
 
     def _record_system_boot(self) -> None:
         try:

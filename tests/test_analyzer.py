@@ -184,6 +184,48 @@ class ReportAnalyzerTest(unittest.TestCase):
         )
         self.assertNotIn("No shutdown observation after the last active segment.", report.anomalies)
 
+    def test_past_day_without_shutdown_stops_at_last_known_observation(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:07:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:23:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T13:51:00+02:00", ObservationType.ACTIVITY_RESUMED),
+        ]
+
+        report = ReportAnalyzer(
+            now_provider=lambda: datetime.fromisoformat("2026-07-09T09:00:00+02:00")
+        ).build_daily(day, observations)
+
+        self.assertEqual(1, len(report.work_blocks))
+        self.assertEqual(1, len(report.break_blocks))
+        self.assertEqual("09:07", report.work_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("12:23", report.work_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("12:23", report.break_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("13:58", report.break_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual(3 * 3600 + 16 * 60, report.worked_seconds)
+        self.assertIn(
+            "No shutdown observation after the last active segment; "
+            "stopping the past-day estimate at the last known observation.",
+            report.anomalies,
+        )
+
+    def test_past_day_without_shutdown_uses_last_heartbeat_as_estimated_end(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:07:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:23:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T13:51:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T18:05:00+02:00", ObservationType.APP_HEARTBEAT),
+        ]
+
+        report = ReportAnalyzer(
+            now_provider=lambda: datetime.fromisoformat("2026-07-09T09:00:00+02:00")
+        ).build_daily(day, observations)
+
+        self.assertEqual(2, len(report.work_blocks))
+        self.assertEqual("13:58", report.work_blocks[1].start.strftime("%H:%M"))
+        self.assertEqual("18:05", report.work_blocks[1].end.strftime("%H:%M"))
+
     def test_non_last_app_stopped_does_not_close_work_block(self) -> None:
         day = date(2026, 7, 8)
         observations = [

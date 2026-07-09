@@ -14,6 +14,7 @@ class Settings:
     notifications_enabled: bool = True
     icon_theme: str = "head-small"
     activity_poll_seconds: float = 10.0
+    heartbeat_interval_seconds: float = 300.0
 
     @property
     def idle_threshold_seconds(self) -> int:

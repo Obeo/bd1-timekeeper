@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from datetime import datetime
 from pathlib import Path
@@ -59,6 +60,29 @@ class BD1ApplicationTest(unittest.TestCase):
                     self.assertFalse(app.settings.autostart_enabled)
             finally:
                 store.close()
+
+    def test_records_periodic_app_heartbeats(self) -> None:
+        now = datetime.now().astimezone()
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(
+                    Settings(heartbeat_interval_seconds=1.0),
+                    store,
+                    activity_monitor_enabled=False,
+                )
+
+                app._start_heartbeat()
+                time.sleep(1.2)
+                app._stop_heartbeat()
+
+                observations = store.list_for_day(now.date())
+            finally:
+                store.close()
+
+        self.assertTrue(
+            any(observation.type == ObservationType.APP_HEARTBEAT for observation in observations)
+        )
 
 
 class FakeAutostartManager:

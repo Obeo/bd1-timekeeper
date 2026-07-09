@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from bd1.models import DailyReport, TimeBlock, WeeklyReport
+from bd1.models import DailyReport, Observation, ObservationType, TimeBlock, WeeklyReport
 
 
 def format_duration(seconds: int) -> str:
@@ -28,8 +28,9 @@ def format_daily_report(report: DailyReport) -> str:
         lines.extend(f"- {anomaly}" for anomaly in report.anomalies)
 
     lines.extend(["", "Observed timeline:"])
-    if report.observations:
-        for observation in report.observations:
+    visible_observations = _visible_observations(report.observations)
+    if visible_observations:
+        for observation in visible_observations:
             lines.append(f"- {_format_time(observation.observed_at)} {observation.type.value}")
     else:
         lines.append("- No observations")
@@ -74,3 +75,11 @@ def _append_timeline_blocks(
 
 def _format_time(value: datetime) -> str:
     return value.strftime("%H:%M")
+
+
+def _visible_observations(observations: tuple[Observation, ...]) -> tuple[Observation, ...]:
+    return tuple(
+        observation
+        for observation in observations
+        if observation.type != ObservationType.APP_HEARTBEAT
+    )
