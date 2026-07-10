@@ -54,3 +54,7 @@ python -m unittest discover -s tests
 
 The SQLite database and `settings.json` live in the user data directory resolved by
 `platformdirs`.
+
+On Windows, use the `BD-1-setup-x86_64.exe` installer from the build artifacts.
+When autostart was enabled in a previous installation, reinstalling in a different
+folder updates the existing Windows startup entry to the new executable location.

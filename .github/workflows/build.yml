@@ -88,6 +88,16 @@ jobs:
         shell: bash
         run: ditto -c -k --sequesterRsrc --keepParent "dist/BD-1.app" "${{ matrix.artifact_name }}.zip"
 
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Package Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: iscc scripts/windows-installer.iss
+
       - name: Upload Linux artifact
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
@@ -109,5 +119,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: dist/BD-1
+          path: dist/BD-1-setup-x86_64.exe
           if-no-files-found: error

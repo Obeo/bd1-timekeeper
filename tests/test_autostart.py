@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from bd1.autostart import AutostartManager
@@ -32,6 +34,51 @@ class AutostartManagerTest(unittest.TestCase):
         self.assertFalse(status.supported)
         self.assertFalse(status.enabled)
         self.assertIn("Unsupported platform", status.detail)
+
+    def test_windows_refresh_replaces_an_existing_command(self) -> None:
+        registry = _FakeRegistry({"BD-1": '"C:\\old location\\BD-1.exe"'})
+        winreg = SimpleNamespace(
+            HKEY_CURRENT_USER="current-user",
+            KEY_SET_VALUE=2,
+            REG_SZ=1,
+            OpenKey=registry.open_key,
+            CreateKey=registry.create_key,
+            QueryValueEx=registry.query_value,
+            SetValueEx=registry.set_value,
+            DeleteValue=registry.delete_value,
+        )
+
+        with patch.dict(sys.modules, {"winreg": winreg}):
+            status = AutostartManager([r"D:\\BD-1\\BD-1.exe"], "windows").refresh_if_enabled()
+
+        self.assertTrue(status.enabled)
+        self.assertEqual(registry.values["BD-1"], r"D:\\BD-1\\BD-1.exe")
+
+
+class _FakeRegistry:
+    def __init__(self, values: dict[str, str]) -> None:
+        self.values = values
+
+    def open_key(self, *_: object) -> _FakeRegistry:
+        return self
+
+    def create_key(self, *_: object) -> _FakeRegistry:
+        return self
+
+    def query_value(self, _: object, name: str) -> tuple[str, int]:
+        return self.values[name], 1
+
+    def set_value(self, _: object, name: str, __: int, ___: int, value: str) -> None:
+        self.values[name] = value
+
+    def delete_value(self, _: object, name: str) -> None:
+        del self.values[name]
+
+    def __enter__(self) -> _FakeRegistry:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
 
 
 if __name__ == "__main__":

@@ -60,6 +60,7 @@ class BD1Application:
 
         self._record_system_boot()
         self.add_observation(ObservationType.APP_STARTED, metadata={"source": "app"})
+        self.autostart_manager.refresh_if_enabled()
         self.tray = TrayApp(
             store=self.store,
             report_service=self.report_service,

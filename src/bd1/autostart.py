@@ -72,6 +72,13 @@ class AutostartManager:
             return self.enable()
         return self.disable()
 
+    def refresh_if_enabled(self) -> AutostartStatus:
+        """Rewrite an existing autostart entry with this application's current command."""
+        status = self.status()
+        if not status.enabled:
+            return status
+        return self.enable()
+
     def _enable_linux(self) -> AutostartStatus:
         path = self._linux_desktop_file()
         path.parent.mkdir(parents=True, exist_ok=True)

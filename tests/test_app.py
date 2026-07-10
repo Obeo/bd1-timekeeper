@@ -96,6 +96,9 @@ class FakeAutostartManager:
         self.enabled = enabled
         return AutostartStatus(True, enabled, "fake")
 
+    def refresh_if_enabled(self) -> AutostartStatus:
+        return AutostartStatus(True, self.enabled, "fake")
+
 
 if __name__ == "__main__":
     unittest.main()
