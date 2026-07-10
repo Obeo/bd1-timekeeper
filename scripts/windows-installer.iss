@@ -11,7 +11,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\BD-1
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputDir=dist
+OutputDir=..\dist
 OutputBaseFilename=BD-1-setup-x86_64
 Compression=lzma
 SolidCompression=yes
@@ -20,7 +20,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName={#MyAppName}
 
 [Files]
-Source: "dist\BD-1\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\BD-1\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
