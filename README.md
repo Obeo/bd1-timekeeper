@@ -8,6 +8,41 @@ BD-1 is a local desktop companion that observes user activity and suggests a dai
 weekly time report. It is not a clock-in system: it stores factual observations and
 recomputes suggestions on demand.
 
+## Installation
+
+Installable builds are published from the latest successful build of the `master`
+branch:
+
+<https://github.com/Obeo/bd1-timekeeper/releases/tag/build/master>
+
+Download the asset matching your operating system:
+
+- Windows: `BD-1-setup-x86_64.exe`
+- Linux: `bd1-linux-x86_64.tar.gz`
+- macOS: `bd1-macos-arm64.zip`
+
+### Windows
+
+Run `BD-1-setup-x86_64.exe` and follow the installer. The application is installed
+as `BD-1.exe` and can be launched at the end of the setup.
+
+If autostart was enabled in a previous installation, reinstalling in a different
+folder updates the existing Windows startup entry to the new executable location.
+
+### Linux
+
+Extract `bd1-linux-x86_64.tar.gz`, then run the `BD-1` executable from the extracted
+folder:
+
+```bash
+tar -xzf bd1-linux-x86_64.tar.gz
+./BD-1/BD-1
+```
+
+### macOS
+
+Extract `bd1-macos-arm64.zip`, then open `BD-1.app`.
+
 ## Development
 
 ```bash
@@ -54,7 +89,3 @@ python -m unittest discover -s tests
 
 The SQLite database and `settings.json` live in the user data directory resolved by
 `platformdirs`.
-
-On Windows, use the `BD-1-setup-x86_64.exe` installer from the build artifacts.
-When autostart was enabled in a previous installation, reinstalling in a different
-folder updates the existing Windows startup entry to the new executable location.
