@@ -42,6 +42,25 @@ class ReportAnalyzer:
         pending_lunch_work_start: datetime | None = None
 
         for index, observation in enumerate(interpreted):
+            if observation.type == ObservationType.APP_STOPPED:
+                if current_label is not None and current_start is not None:
+                    self._append_block(
+                        current_label,
+                        current_start,
+                        observation.observed_at,
+                        work_blocks,
+                        break_blocks,
+                    )
+                current_label = None
+                current_start = None
+                pending_lunch_work_start = None
+                if index == len(interpreted) - 1:
+                    anomalies.append(
+                        "Application stopped before a system shutdown was observed; "
+                        "using it as the estimated day end."
+                    )
+                continue
+
             if (
                 pending_lunch_work_start is not None
                 and observation.observed_at >= pending_lunch_work_start
@@ -103,14 +122,7 @@ class ReportAnalyzer:
         if current_label is not None and current_start is not None:
             end_of_day = datetime.combine(day + timedelta(days=1), time.min).astimezone()
             now = self._now_provider()
-            app_stopped_at = self._last_app_stopped_at(ordered)
-            if app_stopped_at is not None and app_stopped_at > current_start:
-                effective_end = min(end_of_day, app_stopped_at)
-                anomalies.append(
-                    "Application stopped before a system shutdown was observed; "
-                    "using it as the estimated day end."
-                )
-            elif day < now.date():
+            if day < now.date():
                 effective_end = self._last_known_end_for_closed_day(
                     interpreted,
                     pending_lunch_work_start,
@@ -211,12 +223,6 @@ class ReportAnalyzer:
             second=0,
             microsecond=0,
         )
-
-    @staticmethod
-    def _last_app_stopped_at(observations: tuple[Observation, ...]) -> datetime | None:
-        if not observations or observations[-1].type != ObservationType.APP_STOPPED:
-            return None
-        return observations[-1].observed_at
 
     @staticmethod
     def _last_known_end_for_closed_day(
