@@ -121,3 +121,53 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: dist/BD-1-setup-x86_64.exe
           if-no-files-found: error
+
+  release:
+    name: Publish branch release
+    if: github.event_name == 'push' && github.ref_type == 'branch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bd1-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Define branch release metadata
+        id: release
+        shell: bash
+        run: |
+          echo "tag=build/${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "title=Latest build: ${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Update branch release tag
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate --force "$TAG" "$GITHUB_SHA" --message "Automated build for ${GITHUB_REF_NAME}"
+          git push origin "refs/tags/$TAG" --force
+
+      - name: Publish branch release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.title }}
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          body: Automated installable builds for the latest successful push to `${{ github.ref_name }}`.
+          files: release-artifacts/*
+          fail_on_unmatched_files: true
+          overwrite_files: true
