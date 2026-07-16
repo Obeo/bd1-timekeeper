@@ -23,6 +23,7 @@ class Settings:
     icon_theme: str = "head-small"
     activity_poll_seconds: float = 10.0
     heartbeat_interval_seconds: float = 300.0
+    idle_ignored_process_names: tuple[str, ...] = ("aomhost64.exe",)
 
     @property
     def idle_threshold_seconds(self) -> int:
@@ -39,6 +40,13 @@ def load_settings(path: Path | None = None) -> Settings:
         raw = json.load(file)
     allowed = {field.name for field in Settings.__dataclass_fields__.values()}
     data = {key: value for key, value in raw.items() if key in allowed}
+    if "idle_ignored_process_names" in data:
+        names = data["idle_ignored_process_names"]
+        if isinstance(names, str):
+            names = (names,)
+        elif not isinstance(names, (list, tuple)):
+            names = ()
+        data["idle_ignored_process_names"] = tuple(str(name) for name in names if str(name))
     return Settings(**data)
 
 

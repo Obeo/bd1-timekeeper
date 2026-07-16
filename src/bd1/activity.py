@@ -19,8 +19,10 @@ from typing import Any
 from pynput import keyboard, mouse
 
 from bd1.models import ObservationType
+from bd1.processes import is_any_process_running
 
 ObservationCallback = Callable[[ObservationType, datetime | None, dict[str, object] | None], None]
+ProcessRunningChecker = Callable[[tuple[str, ...]], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,10 +38,14 @@ class ActivityMonitor:
         idle_threshold_seconds: int,
         callback: ObservationCallback,
         poll_seconds: float = 10.0,
+        idle_ignored_process_names: tuple[str, ...] = (),
+        process_running_checker: ProcessRunningChecker = is_any_process_running,
     ) -> None:
         self.idle_threshold_seconds = idle_threshold_seconds
         self.poll_seconds = poll_seconds
         self.callback = callback
+        self.idle_ignored_process_names = idle_ignored_process_names
+        self.process_running_checker = process_running_checker
         self._last_activity_monotonic = time.monotonic()
         self._last_activity_at = datetime.now().astimezone()
         self._seen_activity = False
@@ -98,6 +104,10 @@ class ActivityMonitor:
                     idle_seconds = time.monotonic() - self._last_activity_monotonic
                     if idle_seconds < self.idle_threshold_seconds:
                         continue
+                    if self._has_ignored_process_running():
+                        self._last_activity_monotonic = time.monotonic()
+                        self._last_activity_at = datetime.now().astimezone()
+                        continue
                     self._idle = True
                     idle_started_at = self._last_activity_at
 
@@ -137,3 +147,11 @@ class ActivityMonitor:
             listener.stop()
         except Exception:
             return
+
+    def _has_ignored_process_running(self) -> bool:
+        if not self.idle_ignored_process_names:
+            return False
+        try:
+            return self.process_running_checker(self.idle_ignored_process_names)
+        except Exception:
+            return False

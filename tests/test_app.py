@@ -13,7 +13,8 @@ import time
 import unittest
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from types import ModuleType
+from unittest.mock import Mock, patch
 
 from bd1.app import BD1Application
 from bd1.autostart import AutostartStatus
@@ -90,6 +91,27 @@ class BD1ApplicationTest(unittest.TestCase):
 
         self.assertTrue(
             any(observation.type == ObservationType.APP_HEARTBEAT for observation in observations)
+        )
+
+    def test_passes_idle_ignored_process_names_to_activity_monitor(self) -> None:
+        monitor = Mock()
+        activity_module = ModuleType("bd1.activity")
+        activity_module.ActivityMonitor = monitor
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                with patch.dict("sys.modules", {"bd1.activity": activity_module}):
+                    BD1Application(
+                        Settings(idle_ignored_process_names=("aomhost64.exe",)),
+                        store,
+                    )
+            finally:
+                store.close()
+
+        self.assertEqual(
+            ("aomhost64.exe",),
+            monitor.call_args.kwargs["idle_ignored_process_names"],
         )
 
 

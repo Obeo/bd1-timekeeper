@@ -51,6 +51,42 @@ tar -xzf bd1-linux-x86_64.tar.gz
 
 Extract `bd1-macos-arm64.zip`, then open `BD-1.app`.
 
+### Settings
+
+BD-1 creates a `settings.json` file in the user data directory resolved by
+`platformdirs`. On Windows, this is typically:
+
+```text
+%LOCALAPPDATA%\BD-1\BD-1\settings.json
+```
+
+The `idle_ignored_process_names` setting lists process names that should prevent
+BD-1 from turning keyboard and mouse inactivity into a break. This is useful for
+meeting applications where the user may be working without touching the keyboard
+or mouse.
+
+By default, BD-1 includes `aomhost64.exe`, which is used by Zoom meetings on
+Windows:
+
+```json
+{
+  "idle_ignored_process_names": [
+    "aomhost64.exe"
+  ]
+}
+```
+
+To ignore more applications, add their process names to the list:
+
+```json
+{
+  "idle_ignored_process_names": [
+    "aomhost64.exe",
+    "Teams.exe"
+  ]
+}
+```
+
 ## Development
 
 ```bash

@@ -52,6 +52,7 @@ class BD1Application:
                 idle_threshold_seconds=settings.idle_threshold_seconds,
                 callback=self.add_observation,
                 poll_seconds=settings.activity_poll_seconds,
+                idle_ignored_process_names=settings.idle_ignored_process_names,
             )
         self._stopping = False
         self._stop_lock = threading.Lock()
