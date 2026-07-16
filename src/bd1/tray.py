@@ -69,7 +69,7 @@ class TrayApp:
             pystray.MenuItem(f"Etat : {self._state_label()}", None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Marquer : debut de travail",
+                "Marquer : début de travail",
                 lambda *_: self.add_observation(
                     ObservationType.USER_WORKING,
                     None,
@@ -77,7 +77,7 @@ class TrayApp:
                 ),
             ),
             pystray.MenuItem(
-                "Marquer : debut de pause",
+                "Marquer : début de pause",
                 lambda *_: self.add_observation(
                     ObservationType.USER_BREAK,
                     None,
@@ -169,7 +169,7 @@ class TrayApp:
         navigation = tk.Frame(toolbar)
         navigation.pack(side="right", padx=8, pady=6)
 
-        previous_button = tk.Button(navigation, text="Precedent", command=move_back)
+        previous_button = tk.Button(navigation, text="Précédent", command=move_back)
         previous_button.pack(side="left", padx=(0, 4))
 
         next_button = tk.Button(navigation, text="Suivant", command=move_forward)
