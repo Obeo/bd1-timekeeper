@@ -14,6 +14,7 @@ import sys
 import sysconfig
 from datetime import date, datetime
 from importlib.util import find_spec
+from multiprocessing import freeze_support
 
 from bd1.formatting import format_daily_report, format_weekly_report
 from bd1.models import ObservationType
@@ -22,6 +23,7 @@ from bd1.storage import ObservationStore
 
 
 def main() -> None:
+    freeze_support()
     parser = argparse.ArgumentParser(description="BD-1 desktop companion")
     parser.add_argument("--report", choices=("today", "week"), help="Print a report and exit.")
     parser.add_argument("--date", help="Report date in YYYY-MM-DD format. Defaults to today.")

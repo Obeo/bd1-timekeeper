@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING
 
 from bd1.autostart import AutostartManager
 from bd1.models import ObservationType
-from bd1.reports import ReportService
 from bd1.settings import Settings, save_settings
 from bd1.state import StateMachine
 from bd1.storage import ObservationStore
@@ -44,7 +43,6 @@ class BD1Application:
         self.boot_time_provider = boot_time_provider
         self.autostart_manager = autostart_manager or AutostartManager()
         self.state_machine = StateMachine()
-        self.report_service = ReportService(store)
         self.tray: TrayApp | None = None
         self.activity_monitor: ActivityMonitor | None = None
         if activity_monitor_enabled:
@@ -71,7 +69,6 @@ class BD1Application:
         self.autostart_manager.refresh_if_enabled()
         self.tray = TrayApp(
             store=self.store,
-            report_service=self.report_service,
             add_observation=self.add_observation,
             autostart_is_enabled=self.autostart_is_enabled,
             toggle_autostart=self.toggle_autostart,
