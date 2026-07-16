@@ -166,11 +166,14 @@ class TrayApp:
             current_date = current_date + step
             render()
 
-        previous_button = tk.Button(toolbar, text="Precedent", command=move_back)
-        previous_button.pack(side="right", padx=(4, 8), pady=6)
+        navigation = tk.Frame(toolbar)
+        navigation.pack(side="right", padx=8, pady=6)
 
-        next_button = tk.Button(toolbar, text="Suivant", command=move_forward)
-        next_button.pack(side="right", padx=4, pady=6)
+        previous_button = tk.Button(navigation, text="Precedent", command=move_back)
+        previous_button.pack(side="left", padx=(0, 4))
+
+        next_button = tk.Button(navigation, text="Suivant", command=move_forward)
+        next_button.pack(side="left", padx=(4, 0))
 
         render()
         root.mainloop()
