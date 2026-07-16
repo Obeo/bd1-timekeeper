@@ -160,7 +160,6 @@ class _ReportWindowUI:
         scope_var = tk.StringVar()
         worked_var = tk.StringVar()
         break_var = tk.StringVar()
-        status_var = tk.StringVar()
         status_message_var = tk.StringVar()
 
         root.columnconfigure(0, weight=1)
@@ -216,7 +215,7 @@ class _ReportWindowUI:
 
         summary = tk.Frame(root, padx=16, pady=4)
         summary.grid(row=2, column=0, sticky="ew", pady=(0, 6))
-        for column in range(3):
+        for column in range(2):
             summary.columnconfigure(column, weight=1)
 
         tk.Label(summary, text="Travail estimé", anchor="w").grid(row=0, column=0, sticky="w")
@@ -233,14 +232,6 @@ class _ReportWindowUI:
             anchor="w",
             font=("TkDefaultFont", 12, "bold"),
         ).grid(row=1, column=1, sticky="w")
-        tk.Label(summary, text="État des données", anchor="w").grid(row=0, column=2, sticky="w")
-        tk.Label(
-            summary,
-            textvariable=status_var,
-            anchor="w",
-            font=("TkDefaultFont", 12, "bold"),
-        ).grid(row=1, column=2, sticky="w")
-
         content_frame = tk.Frame(root, padx=16)
         content_frame.grid(row=3, column=0, sticky="nsew")
         content_frame.columnconfigure(0, weight=1)
@@ -263,7 +254,6 @@ class _ReportWindowUI:
         text.tag_configure("work", foreground="#176b45")
         text.tag_configure("break", foreground="#985000")
         text.tag_configure("muted", foreground="#666666")
-        text.tag_configure("warning", foreground="#a52a2a")
 
         footer = tk.Frame(root, padx=16, pady=4)
         footer.grid(row=4, column=0, sticky="ew", pady=(6, 10))
@@ -362,13 +352,11 @@ class _ReportWindowUI:
                 _render_daily(text, report)
                 worked_var.set(format_duration(report.worked_seconds))
                 break_var.set(format_duration(report.break_seconds))
-                status_var.set(_daily_status(report))
             else:
                 report = self.report_service.weekly(current_date)
                 _render_weekly(text, report)
                 worked_var.set(format_duration(report.worked_seconds))
                 break_var.set(format_duration(sum(day.break_seconds for day in report.days)))
-                status_var.set(_weekly_status(report))
 
             scope_var.set(_scope_title(current_view, current_date))
             today_button.configure(
@@ -426,21 +414,6 @@ def _format_date(value: date) -> str:
     return f"{_WEEKDAYS[value.weekday()]} {value.day} {_MONTHS[value.month - 1]} {value.year}"
 
 
-def _daily_status(report: DailyReport) -> str:
-    if not _visible_observations(report.observations):
-        return "Aucune information"
-    return "Données partielles" if report.anomalies else "Données complètes"
-
-
-def _weekly_status(report: WeeklyReport) -> str:
-    with_data = [day for day in report.days if _visible_observations(day.observations)]
-    if not with_data:
-        return "Aucune information"
-    if len(with_data) < len(report.days) or any(day.anomalies for day in with_data):
-        return "Données partielles"
-    return "Données complètes"
-
-
 def _render_daily(text: Any, report: DailyReport) -> None:
     _clear(text)
     _insert_section(text, "Interprétation")
@@ -450,11 +423,6 @@ def _render_daily(text: Any, report: DailyReport) -> None:
             _insert_block(text, block)
     else:
         _insert_line(text, "Aucune plage interprétée.", "muted")
-
-    if report.anomalies:
-        _insert_section(text, "Qualité des données")
-        for anomaly in report.anomalies:
-            _insert_line(text, f"! {anomaly}", "warning")
 
     _insert_section(text, "Chronologie observée")
     observations = _visible_observations(report.observations)
@@ -484,9 +452,6 @@ def _render_weekly(text: Any, report: WeeklyReport) -> None:
                     _insert_block(text, block, indent="  ")
             else:
                 _insert_line(text, "Aucune plage interprétée.", "muted")
-            for anomaly in day.anomalies:
-                _insert_line(text, f"! {anomaly}", "warning")
-
         if index < len(report.days) - 1:
             _insert_line(text, "", "muted")
 
