@@ -1,3 +1,11 @@
+<!-- Copyright (c) 2026 Obeo -->
+<!-- -->
+<!-- This program and the accompanying materials are made available under the -->
+<!-- terms of the Eclipse Public License 2.0 which is available at -->
+<!-- https://www.eclipse.org/legal/epl-2.0. -->
+<!-- -->
+<!-- SPDX-License-Identifier: EPL-2.0 -->
+
 # BD-1
 
 <p align="center">
@@ -89,3 +97,20 @@ python -m unittest discover -s tests
 
 The SQLite database and `settings.json` live in the user data directory resolved by
 `platformdirs`.
+
+## License
+
+Copyright (c) 2026 Obeo.
+
+BD-1 is made available under the Eclipse Public License 2.0. See
+[LICENSE](LICENSE) for the complete terms and [NOTICE](NOTICE) for project
+copyright and redistribution information.
+
+The application includes third-party dependencies under their own licenses. See
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the dependency inventory.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, testing, and contribution
+guidelines. Security reports should follow [SECURITY.md](SECURITY.md). Product
+changes are tracked in [CHANGELOG.md](CHANGELOG.md).

@@ -1,3 +1,11 @@
+# Copyright (c) 2026 Obeo
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# https://www.eclipse.org/legal/epl-2.0/.
+#
+# SPDX-License-Identifier: EPL-2.0
+
 name: Build executables
 
 on:
@@ -77,6 +85,16 @@ jobs:
             --collect-data bd1 \
             ${{ matrix.pyinstaller_hidden_imports }} \
             scripts/bd1_entry.py
+
+      - name: Include OSS notices in application bundle
+        if: runner.os == 'Linux' || runner.os == 'Windows'
+        shell: bash
+        run: cp LICENSE NOTICE THIRD_PARTY_LICENSES.md dist/BD-1/
+
+      - name: Include OSS notices in macOS application
+        if: runner.os == 'macOS'
+        shell: bash
+        run: cp LICENSE NOTICE THIRD_PARTY_LICENSES.md dist/BD-1.app/Contents/Resources/
 
       - name: Package Linux bundle
         if: runner.os == 'Linux'

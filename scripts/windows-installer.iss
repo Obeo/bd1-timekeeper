@@ -1,3 +1,11 @@
+; Copyright (c) 2026 Obeo
+;
+; This program and the accompanying materials are made available under the
+; terms of the Eclipse Public License 2.0 which is available at
+; https://www.eclipse.org/legal/epl-2.0.
+;
+; SPDX-License-Identifier: EPL-2.0
+
 #define MyAppName "BD-1"
 #define MyAppVersion "0.1.0"
 #define MyAppPublisher "Obeo"
@@ -8,6 +16,10 @@ AppId={{7A80A08B-B34A-4A99-8093-88B5A2E4CA63}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
+AppPublisherURL=https://github.com/Obeo/bd1-timekeeper
+AppSupportURL=https://github.com/Obeo/bd1-timekeeper/issues
+AppUpdatesURL=https://github.com/Obeo/bd1-timekeeper/releases
+LicenseFile=..\LICENSE
 DefaultDirName={autopf}\BD-1
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes

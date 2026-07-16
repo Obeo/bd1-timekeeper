@@ -1,0 +1,14 @@
+BD-1
+Copyright (c) 2026 Obeo
+
+BD-1 is distributed under the Eclipse Public License 2.0 (EPL-2.0).
+The license is provided in the LICENSE file and is also available at:
+https://www.eclipse.org/legal/epl-2.0/
+
+Unless otherwise indicated, the BD-1 source code, documentation, configuration,
+tests, installer scripts, and original image assets in this repository are
+Copyright (c) 2026 Obeo and are made available under the EPL-2.0.
+
+BD-1 includes or may include third-party components under their own licenses.
+Those components are not relicensed by this notice. See
+THIRD_PARTY_LICENSES.md for the dependency inventory and upstream license links.
