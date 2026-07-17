@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import atexit
 import signal
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import replace
@@ -26,6 +27,7 @@ from bd1.tray import TrayApp
 
 if TYPE_CHECKING:
     from bd1.activity import ActivityMonitor
+    from bd1.windows_session import WindowsSessionEndListener
 
 
 class BD1Application:
@@ -45,6 +47,7 @@ class BD1Application:
         self.state_machine = StateMachine()
         self.tray: TrayApp | None = None
         self.activity_monitor: ActivityMonitor | None = None
+        self.windows_session_listener: WindowsSessionEndListener | None = None
         if activity_monitor_enabled:
             from bd1.activity import ActivityMonitor
 
@@ -57,6 +60,7 @@ class BD1Application:
         self._stopping = False
         self._stop_lock = threading.Lock()
         self._shutdown_requested = threading.Event()
+        self._windows_session_end_recorded = threading.Event()
         self._heartbeat_stop = threading.Event()
         self._heartbeat_thread: threading.Thread | None = None
 
@@ -77,6 +81,7 @@ class BD1Application:
         )
         if self.activity_monitor is not None:
             self.activity_monitor.start()
+        self._start_windows_session_listener()
         self._start_heartbeat()
         self._start_signal_watcher()
         try:
@@ -92,6 +97,8 @@ class BD1Application:
 
         if self.activity_monitor is not None:
             self.activity_monitor.stop()
+        if self.windows_session_listener is not None:
+            self.windows_session_listener.stop()
         self._stop_heartbeat()
         self._record_app_stopped()
         if self.tray is not None:
@@ -128,6 +135,31 @@ class BD1Application:
             self.store.add(ObservationType.APP_STOPPED, metadata={"source": "app"})
         except RuntimeError:
             return
+
+    def _record_windows_session_end(self, phase: str) -> None:
+        if self._windows_session_end_recorded.is_set():
+            return
+        self._windows_session_end_recorded.set()
+        try:
+            self.store.add(
+                ObservationType.SHUTDOWN,
+                metadata={"source": "windows_session", "phase": phase},
+            )
+            self.store.add(
+                ObservationType.APP_STOPPED,
+                metadata={"source": "windows_session", "phase": phase},
+            )
+        except RuntimeError:
+            return
+
+    def _start_windows_session_listener(self) -> None:
+        if sys.platform != "win32":
+            return
+
+        from bd1.windows_session import WindowsSessionEndListener
+
+        self.windows_session_listener = WindowsSessionEndListener(self._record_windows_session_end)
+        self.windows_session_listener.start()
 
     def _start_heartbeat(self) -> None:
         self._heartbeat_thread = threading.Thread(target=self._record_heartbeats, daemon=True)
