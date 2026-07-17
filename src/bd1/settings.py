@@ -23,7 +23,7 @@ class Settings:
     icon_theme: str = "head-small"
     activity_poll_seconds: float = 10.0
     heartbeat_interval_seconds: float = 300.0
-    idle_ignored_process_names: tuple[str, ...] = ("aomhost64.exe",)
+    idle_ignored_process_names: tuple[str, ...] = ("aomhost64.exe", "cpthost")
 
     @property
     def idle_threshold_seconds(self) -> int:

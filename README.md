@@ -65,13 +65,14 @@ BD-1 from turning keyboard and mouse inactivity into a break. This is useful for
 meeting applications where the user may be working without touching the keyboard
 or mouse.
 
-By default, BD-1 includes `aomhost64.exe`, which is used by Zoom meetings on
-Windows:
+By default, BD-1 includes the Zoom meeting processes `aomhost64.exe` on Windows
+and `cpthost` on Linux:
 
 ```json
 {
   "idle_ignored_process_names": [
-    "aomhost64.exe"
+    "aomhost64.exe",
+    "cpthost"
   ]
 }
 ```
@@ -82,6 +83,7 @@ To ignore more applications, add their process names to the list:
 {
   "idle_ignored_process_names": [
     "aomhost64.exe",
+    "cpthost",
     "Teams.exe"
   ]
 }

@@ -34,7 +34,10 @@ class SettingsTest(unittest.TestCase):
 
             settings = load_settings(path)
 
-        self.assertEqual(("aomhost64.exe",), settings.idle_ignored_process_names)
+        self.assertEqual(
+            ("aomhost64.exe", "cpthost"),
+            settings.idle_ignored_process_names,
+        )
 
 
 if __name__ == "__main__":
