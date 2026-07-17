@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from bd1.autostart import AutostartManager
 from bd1.models import ObservationType
 from bd1.settings import Settings, save_settings
+from bd1.single_instance import SingleInstanceLock
 from bd1.state import StateMachine
 from bd1.storage import ObservationStore
 from bd1.system import system_boot_time
@@ -38,12 +39,14 @@ class BD1Application:
         activity_monitor_enabled: bool = True,
         boot_time_provider: Callable[[], datetime] = system_boot_time,
         autostart_manager: AutostartManager | None = None,
+        single_instance_lock: SingleInstanceLock | None = None,
     ) -> None:
         self.settings = settings
         self.store = store
         self.activity_monitor_enabled = activity_monitor_enabled
         self.boot_time_provider = boot_time_provider
         self.autostart_manager = autostart_manager or AutostartManager()
+        self.single_instance_lock = single_instance_lock or SingleInstanceLock()
         self.state_machine = StateMachine()
         self.tray: TrayApp | None = None
         self.activity_monitor: ActivityMonitor | None = None
@@ -65,6 +68,9 @@ class BD1Application:
         self._heartbeat_thread: threading.Thread | None = None
 
     def run(self) -> None:
+        if not self.single_instance_lock.acquire():
+            return
+
         atexit.register(self._record_app_stopped)
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
@@ -104,6 +110,7 @@ class BD1Application:
         if self.tray is not None:
             self.tray.stop()
         self.store.close()
+        self.single_instance_lock.release()
 
     def add_observation(
         self,

@@ -93,6 +93,27 @@ class BD1ApplicationTest(unittest.TestCase):
             any(observation.type == ObservationType.APP_HEARTBEAT for observation in observations)
         )
 
+    def test_run_exits_when_another_instance_is_running(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(
+                    Settings(),
+                    store,
+                    activity_monitor_enabled=False,
+                    single_instance_lock=FakeSingleInstanceLock(acquired=False),
+                )
+
+                app.run()
+
+                observations = store.list_for_day(datetime.now().astimezone().date())
+            finally:
+                store.close()
+
+        self.assertFalse(
+            any(observation.type == ObservationType.APP_STARTED for observation in observations)
+        )
+
     def test_passes_idle_ignored_process_names_to_activity_monitor(self) -> None:
         monitor = Mock()
         activity_module = ModuleType("bd1.activity")
@@ -167,6 +188,7 @@ class BD1ApplicationTest(unittest.TestCase):
         listener.assert_called_once_with(app._record_windows_session_end)
         listener.return_value.start.assert_called_once_with()
 
+
 class FakeAutostartManager:
     def __init__(self) -> None:
         self.enabled = False
@@ -180,6 +202,18 @@ class FakeAutostartManager:
 
     def refresh_if_enabled(self) -> AutostartStatus:
         return AutostartStatus(True, self.enabled, "fake")
+
+
+class FakeSingleInstanceLock:
+    def __init__(self, acquired: bool = True) -> None:
+        self.acquired = acquired
+        self.released = False
+
+    def acquire(self) -> bool:
+        return self.acquired
+
+    def release(self) -> None:
+        self.released = True
 
 
 if __name__ == "__main__":
