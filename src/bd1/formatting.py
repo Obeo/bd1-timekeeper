@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from bd1.calendar import is_working_day
 from bd1.models import DailyReport, Observation, ObservationType, TimeBlock, WeeklyReport
 
 
@@ -49,7 +50,7 @@ def format_daily_report(report: DailyReport) -> str:
 def format_weekly_report(report: WeeklyReport) -> str:
     lines = [f"BD-1 weekly report - week of {report.week_start}", ""]
     for day in report.days:
-        if _is_weekend(day.date):
+        if not is_working_day(datetime.fromisoformat(day.date).date()):
             continue
         if not day.observations:
             lines.append(f"{day.date}: no observations")
@@ -63,10 +64,6 @@ def format_weekly_report(report: WeeklyReport) -> str:
         lines.append("")
     lines.append(f"Weekly total: {format_duration(report.worked_seconds)}")
     return "\n".join(lines)
-
-
-def _is_weekend(day: str) -> bool:
-    return datetime.fromisoformat(day).weekday() >= 5
 
 
 def _append_timeline_blocks(

@@ -13,6 +13,7 @@ from collections.abc import Callable
 from datetime import date
 
 from bd1.analyzer import WORK_START_EVENTS, ReportAnalyzer
+from bd1.calendar import is_working_day
 from bd1.models import DailyReport, WeeklyReport
 from bd1.storage import ObservationStore
 
@@ -45,10 +46,7 @@ class ReportService:
         observations_by_day = defaultdict(list)
         for observation in self.store.list_all():
             observation_day = observation.observed_at.date()
-            if (
-                period_start <= observation_day < today
-                and observation_day.weekday() < 5
-            ):
+            if period_start <= observation_day < today and is_working_day(observation_day):
                 observations_by_day[observation_day].append(observation)
 
         correction_seconds = 0

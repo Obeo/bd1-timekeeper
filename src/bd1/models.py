@@ -13,6 +13,8 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
+from bd1.calendar import is_working_day
+
 
 class ObservationType(StrEnum):
     BOOT = "BOOT"
@@ -85,6 +87,4 @@ class WeeklyReport:
 
     @property
     def _workdays(self) -> tuple[DailyReport, ...]:
-        return tuple(
-            day for day in self.days if date.fromisoformat(day.date).weekday() < 5
-        )
+        return tuple(day for day in self.days if is_working_day(date.fromisoformat(day.date)))

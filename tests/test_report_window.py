@@ -21,6 +21,7 @@ from bd1.report_window import (
     _render_weekly,
     _scope_title,
     format_correction,
+    format_correction_explanation,
 )
 
 
@@ -57,20 +58,24 @@ class ReportWindowHelpersTest(unittest.TestCase):
             _normalize_date(ReportView.DAY, date(2026, 7, 12)),
         )
 
+    def test_day_view_normalizes_french_holiday_to_previous_workday(self) -> None:
+        self.assertEqual(
+            date(2026, 7, 13),
+            _normalize_date(ReportView.DAY, date(2026, 7, 14)),
+        )
+
     def test_day_navigation_skips_weekend(self) -> None:
         self.assertEqual(date(2026, 7, 13), _move_workday(date(2026, 7, 10), 1))
         self.assertEqual(date(2026, 7, 10), _move_workday(date(2026, 7, 13), -1))
+        self.assertEqual(date(2026, 7, 15), _move_workday(date(2026, 7, 13), 1))
 
     def test_formats_correction_as_signed_decimal_hours(self) -> None:
-        self.assertEqual(
-            "+0,5 h — 0,5 h en plus que la référence",
-            format_correction(30 * 60),
-        )
-        self.assertEqual(
-            "-1,0 h — 1,0 h en moins que la référence",
-            format_correction(-60 * 60),
-        )
-        self.assertEqual("+0,0 h — à l'équilibre", format_correction(0))
+        self.assertEqual("+0,5 h", format_correction(30 * 60))
+        self.assertEqual("-1,0 h", format_correction(-60 * 60))
+        self.assertEqual("+0,0 h", format_correction(0))
+        self.assertEqual("0,5 h en plus que la référence", format_correction_explanation(30 * 60))
+        self.assertEqual("1,0 h en moins que la référence", format_correction_explanation(-60 * 60))
+        self.assertEqual("À l'équilibre", format_correction_explanation(0))
 
     def test_scope_title_describes_day_and_week(self) -> None:
         current = date(2026, 7, 10)

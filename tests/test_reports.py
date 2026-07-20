@@ -50,6 +50,14 @@ class ReportServiceTest(unittest.TestCase):
                 )
                 store.add(
                     ObservationType.FIRST_ACTIVITY,
+                    datetime.fromisoformat("2026-07-14T09:00:00+02:00"),
+                )
+                store.add(
+                    ObservationType.SHUTDOWN,
+                    datetime.fromisoformat("2026-07-14T16:24:00+02:00"),
+                )
+                store.add(
+                    ObservationType.FIRST_ACTIVITY,
                     datetime.fromisoformat("2026-05-29T09:00:00+02:00"),
                 )
                 store.add(

@@ -18,6 +18,7 @@ from queue import Empty
 from threading import Thread
 from typing import Any, Literal
 
+from bd1.calendar import is_working_day
 from bd1.formatting import format_duration
 from bd1.models import DailyReport, Observation, ObservationType, TimeBlock, WeeklyReport
 from bd1.reports import ReportService
@@ -161,6 +162,7 @@ class _ReportWindowUI:
         worked_var = tk.StringVar()
         break_var = tk.StringVar()
         correction_var = tk.StringVar()
+        correction_explanation_var = tk.StringVar()
         status_message_var = tk.StringVar()
 
         root.columnconfigure(0, weight=1)
@@ -244,6 +246,12 @@ class _ReportWindowUI:
             anchor="w",
             font=("TkDefaultFont", 12, "bold"),
         ).grid(row=1, column=2, sticky="w")
+        tk.Label(
+            summary,
+            textvariable=correction_explanation_var,
+            anchor="w",
+            font=("TkDefaultFont", 9, "italic"),
+        ).grid(row=2, column=2, sticky="w")
         content_frame = tk.Frame(root, padx=16)
         content_frame.grid(row=3, column=0, sticky="nsew")
         content_frame.columnconfigure(0, weight=1)
@@ -369,7 +377,9 @@ class _ReportWindowUI:
                 _render_weekly(text, report)
                 worked_var.set(format_duration(report.worked_seconds))
                 break_var.set(format_duration(report.break_seconds))
-            correction_var.set(format_correction(self.report_service.all_time_correction_seconds()))
+            correction_seconds = self.report_service.all_time_correction_seconds()
+            correction_var.set(format_correction(correction_seconds))
+            correction_explanation_var.set(format_correction_explanation(correction_seconds))
 
             scope_var.set(_scope_title(current_view, current_date))
             today_button.configure(
@@ -405,27 +415,31 @@ class _ReportWindowUI:
 def _normalize_date(view: ReportView, target_date: date) -> date:
     if view == ReportView.WEEK:
         return target_date - timedelta(days=target_date.weekday())
-    if target_date.weekday() >= 5:
-        return target_date - timedelta(days=target_date.weekday() - 4)
+    while not is_working_day(target_date):
+        target_date -= timedelta(days=1)
     return target_date
 
 
 def _move_workday(current_date: date, direction: int) -> date:
     next_date = current_date + timedelta(days=direction)
-    while next_date.weekday() >= 5:
+    while not is_working_day(next_date):
         next_date += timedelta(days=direction)
     return next_date
 
 
 def format_correction(seconds: int) -> str:
     hours = seconds / (60 * 60)
-    signed_hours = f"{hours:+.1f} h".replace(".", ",")
+    return f"{hours:+.1f} h".replace(".", ",")
+
+
+def format_correction_explanation(seconds: int) -> str:
+    hours = seconds / (60 * 60)
     absolute_hours = f"{abs(hours):.1f} h".replace(".", ",")
     if seconds < 0:
-        return f"{signed_hours} — {absolute_hours} en moins que la référence"
+        return f"{absolute_hours} en moins que la référence"
     if seconds > 0:
-        return f"{signed_hours} — {absolute_hours} en plus que la référence"
-    return f"{signed_hours} — à l'équilibre"
+        return f"{absolute_hours} en plus que la référence"
+    return "À l'équilibre"
 
 
 def _is_today(view: ReportView, current_date: date) -> bool:
@@ -468,7 +482,7 @@ def _render_daily(text: Any, report: DailyReport) -> None:
 
 def _render_weekly(text: Any, report: WeeklyReport) -> None:
     _clear(text)
-    days = tuple(day for day in report.days if date.fromisoformat(day.date).weekday() < 5)
+    days = tuple(day for day in report.days if is_working_day(date.fromisoformat(day.date)))
     for index, day in enumerate(days):
         day_date = date.fromisoformat(day.date)
         tag = f"day-heading-{day.date}"

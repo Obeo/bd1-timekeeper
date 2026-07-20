@@ -32,6 +32,7 @@ classifiers = [
 dependencies = [
     "platformdirs>=4.3",
     "psutil>=6.1",
+    "holidays>=0.38",
     "tzdata>=2025.2",
 ]
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from datetime import date, datetime, time, timedelta
 
+from bd1.calendar import is_working_day
 from bd1.models import DailyReport, Observation, ObservationType, TimeBlock, WeeklyReport
 
 WORK_START_EVENTS = {
@@ -179,7 +180,9 @@ class ReportAnalyzer:
     def build_weekly(self, any_day: date, observations: Iterable[Observation]) -> WeeklyReport:
         week_start = any_day - timedelta(days=any_day.weekday())
         observations_by_day: dict[date, list[Observation]] = {
-            week_start + timedelta(days=offset): [] for offset in range(5)
+            week_start + timedelta(days=offset): []
+            for offset in range(7)
+            if is_working_day(week_start + timedelta(days=offset))
         }
         for observation in observations:
             observation_day = observation.observed_at.date()

@@ -31,6 +31,14 @@ class ReportAnalyzerTest(unittest.TestCase):
         )
         self.assertEqual(0, report.worked_seconds)
 
+    def test_weekly_report_excludes_french_holidays(self) -> None:
+        report = ReportAnalyzer().build_weekly(date(2026, 7, 13), [])
+
+        self.assertEqual(
+            ("2026-07-13", "2026-07-15", "2026-07-16", "2026-07-17"),
+            tuple(day.date for day in report.days),
+        )
+
     def test_builds_work_and_break_blocks_from_observations(self) -> None:
         day = date(2026, 7, 8)
         observations = [
