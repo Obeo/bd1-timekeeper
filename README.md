@@ -25,13 +25,13 @@ branch:
 
 Download the asset matching your operating system:
 
-- Windows: `BD-1-setup-x86_64.exe`
+- Windows: `bd1-windows-x86_64.exe`
 - Linux: `bd1-linux-x86_64.tar.gz`
 - macOS: `bd1-macos-arm64.zip`
 
 ### Windows
 
-Run `BD-1-setup-x86_64.exe` and follow the installer. The application is installed
+Run `bd1-windows-x86_64.exe` and follow the installer. The application is installed
 as `BD-1.exe` and can be launched at the end of the setup.
 
 If autostart was enabled in a previous installation, reinstalling in a different
