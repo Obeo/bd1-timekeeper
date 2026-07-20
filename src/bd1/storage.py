@@ -85,6 +85,21 @@ class ObservationStore:
             )
         return tuple(self._row_to_observation(row) for row in rows)
 
+    def list_all(self) -> tuple[Observation, ...]:
+        with self._lock:
+            rows = (
+                self._require_connection()
+                .execute(
+                    """
+                    SELECT id, observed_at, type, metadata_json
+                    FROM observations
+                    ORDER BY observed_at ASC, id ASC
+                    """
+                )
+                .fetchall()
+            )
+        return tuple(self._row_to_observation(row) for row in rows)
+
     def list_for_day(self, day: date) -> tuple[Observation, ...]:
         start = datetime.combine(day, time.min).astimezone()
         return self.list_between(start, start + timedelta(days=1))

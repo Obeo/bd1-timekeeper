@@ -76,6 +76,25 @@ class ObservationStoreTest(unittest.TestCase):
             finally:
                 store.close()
 
+    def test_lists_all_observations_in_time_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                store.add(
+                    ObservationType.SHUTDOWN,
+                    datetime.fromisoformat("2026-07-08T18:00:00+02:00"),
+                )
+                store.add(
+                    ObservationType.FIRST_ACTIVITY,
+                    datetime.fromisoformat("2026-07-08T09:00:00+02:00"),
+                )
+                observations = store.list_all()
+            finally:
+                store.close()
+
+        self.assertEqual(ObservationType.FIRST_ACTIVITY, observations[0].type)
+        self.assertEqual(ObservationType.SHUTDOWN, observations[1].type)
+
 
 if __name__ == "__main__":
     unittest.main()

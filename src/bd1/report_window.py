@@ -160,6 +160,7 @@ class _ReportWindowUI:
         scope_var = tk.StringVar()
         worked_var = tk.StringVar()
         break_var = tk.StringVar()
+        correction_var = tk.StringVar()
         status_message_var = tk.StringVar()
 
         root.columnconfigure(0, weight=1)
@@ -215,7 +216,7 @@ class _ReportWindowUI:
 
         summary = tk.Frame(root, padx=16, pady=4)
         summary.grid(row=2, column=0, sticky="ew", pady=(0, 6))
-        for column in range(2):
+        for column in range(3):
             summary.columnconfigure(column, weight=1)
 
         tk.Label(summary, text="Travail estimé", anchor="w").grid(row=0, column=0, sticky="w")
@@ -232,6 +233,17 @@ class _ReportWindowUI:
             anchor="w",
             font=("TkDefaultFont", 12, "bold"),
         ).grid(row=1, column=1, sticky="w")
+        tk.Label(
+            summary,
+            text="Correction depuis le 1er juin",
+            anchor="w",
+        ).grid(row=0, column=2, sticky="w")
+        tk.Label(
+            summary,
+            textvariable=correction_var,
+            anchor="w",
+            font=("TkDefaultFont", 12, "bold"),
+        ).grid(row=1, column=2, sticky="w")
         content_frame = tk.Frame(root, padx=16)
         content_frame.grid(row=3, column=0, sticky="nsew")
         content_frame.columnconfigure(0, weight=1)
@@ -357,6 +369,7 @@ class _ReportWindowUI:
                 _render_weekly(text, report)
                 worked_var.set(format_duration(report.worked_seconds))
                 break_var.set(format_duration(report.break_seconds))
+            correction_var.set(format_correction(self.report_service.all_time_correction_seconds()))
 
             scope_var.set(_scope_title(current_view, current_date))
             today_button.configure(
@@ -402,6 +415,17 @@ def _move_workday(current_date: date, direction: int) -> date:
     while next_date.weekday() >= 5:
         next_date += timedelta(days=direction)
     return next_date
+
+
+def format_correction(seconds: int) -> str:
+    hours = seconds / (60 * 60)
+    signed_hours = f"{hours:+.1f} h".replace(".", ",")
+    absolute_hours = f"{abs(hours):.1f} h".replace(".", ",")
+    if seconds < 0:
+        return f"{signed_hours} — {absolute_hours} en moins que la référence"
+    if seconds > 0:
+        return f"{signed_hours} — {absolute_hours} en plus que la référence"
+    return f"{signed_hours} — à l'équilibre"
 
 
 def _is_today(view: ReportView, current_date: date) -> bool:
