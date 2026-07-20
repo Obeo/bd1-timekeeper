@@ -138,7 +138,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: dist/BD-1-setup-x86_64.exe
+          path: dist/${{ matrix.artifact_name }}.exe
           if-no-files-found: error
 
   release:
