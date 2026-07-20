@@ -104,6 +104,21 @@ class ObservationStore:
         start = datetime.combine(day, time.min).astimezone()
         return self.list_between(start, start + timedelta(days=1))
 
+    def delete_for_day(self, day: date) -> int:
+        start = datetime.combine(day, time.min).astimezone()
+        end = start + timedelta(days=1)
+        with self._lock:
+            connection = self._require_connection()
+            with connection:
+                cursor = connection.execute(
+                    """
+                    DELETE FROM observations
+                    WHERE observed_at >= ? AND observed_at < ?
+                    """,
+                    (start.isoformat(), end.isoformat()),
+                )
+        return int(cursor.rowcount)
+
     def list_for_week(self, any_day: date) -> tuple[Observation, ...]:
         week_start = any_day - timedelta(days=any_day.weekday())
         start = datetime.combine(week_start, time.min).astimezone()

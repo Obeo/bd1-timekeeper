@@ -55,6 +55,11 @@ _MONTHS = (
     "novembre",
     "decembre",
 )
+DELETE_DAY_CONFIRMATION = (
+    "Attention, tous les événements de cette journée vont être supprimés.\n\n"
+    "BD-1 considérera ensuite cette journée comme sans information et ne "
+    "l'utilisera plus dans les statistiques globales."
+)
 
 
 class ReportWindow:
@@ -158,6 +163,7 @@ class _ReportWindowUI:
 
     def run(self) -> None:
         import tkinter as tk
+        from tkinter import messagebox
 
         root = tk.Tk()
         root.title("BD-1 - Rapports")
@@ -288,6 +294,12 @@ class _ReportWindowUI:
         footer = tk.Frame(root, padx=16, pady=4)
         footer.grid(row=4, column=0, sticky="ew", pady=(6, 10))
         tk.Label(footer, textvariable=status_message_var, anchor="w").pack(side="left")
+        delete_button = tk.Button(
+            footer,
+            text="Supprimer la journée",
+            command=lambda: delete_current_day(),
+        )
+        delete_button.pack(side="right")
 
         def copy_report(_event: Any = None) -> str:
             try:
@@ -334,6 +346,19 @@ class _ReportWindowUI:
 
         def go_to_today() -> None:
             set_view(current_view, date.today())
+
+        def delete_current_day() -> None:
+            if current_view != ReportView.DAY:
+                return
+            if not messagebox.askyesno(
+                "Supprimer la journée ?",
+                DELETE_DAY_CONFIRMATION,
+                parent=root,
+            ):
+                return
+            deleted_count = self.report_service.delete_day(current_date)
+            render()
+            status_message_var.set(f"{deleted_count} événement(s) supprimé(s)")
 
         def move(direction: int) -> None:
             nonlocal current_date
@@ -397,6 +422,9 @@ class _ReportWindowUI:
             )
             next_button.configure(
                 state="disabled" if _is_latest(current_view, current_date) else "normal"
+            )
+            delete_button.configure(
+                state="normal" if current_view == ReportView.DAY else "disabled"
             )
             status_message_var.set("")
             text.configure(state="disabled")

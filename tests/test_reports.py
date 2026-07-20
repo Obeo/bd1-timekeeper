@@ -97,6 +97,16 @@ class ReportServiceTest(unittest.TestCase):
 
         self.assertEqual(time(13, 45), service.analyzer.lunch_automatic_work_resume)
 
+    def test_deletes_day_observations(self) -> None:
+        store = Mock()
+        store.delete_for_day.return_value = 2
+        service = ReportService(store)
+
+        deleted_count = service.delete_day(date(2026, 7, 9))
+
+        self.assertEqual(2, deleted_count)
+        store.delete_for_day.assert_called_once_with(date(2026, 7, 9))
+
 
 if __name__ == "__main__":
     unittest.main()
