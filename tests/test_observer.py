@@ -13,6 +13,7 @@ import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from typing import ClassVar
 from types import ModuleType
 from unittest.mock import patch
 
@@ -91,7 +92,7 @@ def _activity_module() -> ModuleType:
 
 
 class FakeActivityMonitor:
-    last_kwargs: dict[str, object] = {}
+    last_kwargs: ClassVar[dict[str, object]] = {}
 
     def __init__(self, **kwargs: object) -> None:
         type(self).last_kwargs = kwargs
