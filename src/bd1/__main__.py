@@ -47,6 +47,11 @@ def main() -> None:
         action="store_true",
         help="Run the tray app without keyboard/mouse activity listeners.",
     )
+    parser.add_argument(
+        "--observe",
+        action="store_true",
+        help="Observe activity in the terminal without creating a tray icon.",
+    )
     parser.add_argument("--enable-autostart", action="store_true", help="Enable user autostart.")
     parser.add_argument("--disable-autostart", action="store_true", help="Disable user autostart.")
     parser.add_argument(
@@ -91,6 +96,22 @@ def main() -> None:
                         weekly_cap_hours=settings.weekly_cap_hours,
                     )
                 )
+            return
+        if args.observe:
+            try:
+                from bd1.observer import run_headless_observer
+                from bd1.settings import load_settings
+            except ModuleNotFoundError as error:
+                if error.name == "pynput":
+                    print(
+                        "BD-1 activity observation dependencies are not installed. "
+                        'Run: python -m pip install -e ".[desktop]"',
+                        file=sys.stderr,
+                    )
+                    raise SystemExit(2) from error
+                raise
+
+            run_headless_observer(load_settings(), store)
             return
 
         try:
