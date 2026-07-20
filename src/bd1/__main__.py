@@ -74,8 +74,14 @@ def main() -> None:
             store.add(ObservationType.USER_BREAK, metadata={"source": "cli"})
             return
         if args.report:
+            from bd1.settings import load_settings
+
+            settings = load_settings()
             target_date = _parse_date(args.date)
-            reports = ReportService(store)
+            reports = ReportService(
+                store,
+                lunch_automatic_work_resume=settings.lunch_automatic_work_resume,
+            )
             if args.report == "today":
                 print(format_daily_report(reports.daily(target_date)))
             else:

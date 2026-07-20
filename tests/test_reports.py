@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, time
 from pathlib import Path
+from unittest.mock import Mock
 
 from bd1.models import ObservationType
 from bd1.reports import (
@@ -87,6 +88,14 @@ class ReportServiceTest(unittest.TestCase):
         self.assertEqual(0, correction)
         self.assertEqual(7 * 3600 + 24 * 60, DAILY_TARGET_SECONDS)
         self.assertEqual(2 * 3600, MINIMUM_CORRECTION_WORK_SECONDS)
+
+    def test_passes_lunch_automatic_work_resume_to_analyzer(self) -> None:
+        service = ReportService(
+            Mock(),
+            lunch_automatic_work_resume=time(13, 45),
+        )
+
+        self.assertEqual(time(13, 45), service.analyzer.lunch_automatic_work_resume)
 
 
 if __name__ == "__main__":
