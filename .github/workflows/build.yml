@@ -83,6 +83,7 @@ jobs:
             --windowed \
             --name BD-1 \
             --collect-data bd1 \
+            --collect-data holidays \
             ${{ matrix.pyinstaller_hidden_imports }} \
             scripts/bd1_entry.py
 
