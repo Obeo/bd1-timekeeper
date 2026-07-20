@@ -13,8 +13,8 @@ import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
-from typing import ClassVar
 from types import ModuleType
+from typing import ClassVar
 from unittest.mock import patch
 
 from bd1.models import ObservationType
