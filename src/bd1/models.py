@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -77,4 +77,14 @@ class WeeklyReport:
 
     @property
     def worked_seconds(self) -> int:
-        return sum(day.worked_seconds for day in self.days)
+        return sum(day.worked_seconds for day in self._workdays)
+
+    @property
+    def break_seconds(self) -> int:
+        return sum(day.break_seconds for day in self._workdays)
+
+    @property
+    def _workdays(self) -> tuple[DailyReport, ...]:
+        return tuple(
+            day for day in self.days if date.fromisoformat(day.date).weekday() < 5
+        )

@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from bd1.analyzer import ReportAnalyzer
@@ -19,6 +19,18 @@ PARIS = ZoneInfo("Europe/Paris")
 
 
 class ReportAnalyzerTest(unittest.TestCase):
+    def test_weekly_report_contains_workdays_only(self) -> None:
+        week_start = date(2026, 7, 6)
+        weekend_observation = obs("2026-07-11T09:00:00+02:00", ObservationType.USER_WORKING)
+
+        report = ReportAnalyzer().build_weekly(week_start, [weekend_observation])
+
+        self.assertEqual(
+            tuple((week_start + timedelta(days=offset)).isoformat() for offset in range(5)),
+            tuple(day.date for day in report.days),
+        )
+        self.assertEqual(0, report.worked_seconds)
+
     def test_builds_work_and_break_blocks_from_observations(self) -> None:
         day = date(2026, 7, 8)
         observations = [

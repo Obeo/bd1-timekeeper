@@ -165,6 +165,19 @@ class FormattingTest(unittest.TestCase):
         self.assertIn("2026-07-08: no observations", rendered)
         self.assertNotIn("No user activity detected for this day.", rendered)
 
+    def test_weekly_report_hides_weekend_days(self) -> None:
+        day = DailyReport(
+            date="2026-07-11",
+            observations=(),
+            work_blocks=(),
+            break_blocks=(),
+            anomalies=(),
+        )
+
+        rendered = format_weekly_report(WeeklyReport("2026-07-06", (day,)))
+
+        self.assertNotIn("2026-07-11", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

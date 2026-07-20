@@ -179,7 +179,7 @@ class ReportAnalyzer:
     def build_weekly(self, any_day: date, observations: Iterable[Observation]) -> WeeklyReport:
         week_start = any_day - timedelta(days=any_day.weekday())
         observations_by_day: dict[date, list[Observation]] = {
-            week_start + timedelta(days=offset): [] for offset in range(7)
+            week_start + timedelta(days=offset): [] for offset in range(5)
         }
         for observation in observations:
             observation_day = observation.observed_at.date()

@@ -307,10 +307,10 @@ class _ReportWindowUI:
 
         def move(direction: int) -> None:
             nonlocal current_date
-            increment = timedelta(
-                days=direction if current_view == ReportView.DAY else 7 * direction
-            )
-            next_date = current_date + increment
+            if current_view == ReportView.DAY:
+                next_date = _move_workday(current_date, direction)
+            else:
+                next_date = current_date + timedelta(days=7 * direction)
             if direction > 0 and next_date > _normalize_date(current_view, date.today()):
                 return
             current_date = next_date
@@ -356,7 +356,7 @@ class _ReportWindowUI:
                 report = self.report_service.weekly(current_date)
                 _render_weekly(text, report)
                 worked_var.set(format_duration(report.worked_seconds))
-                break_var.set(format_duration(sum(day.break_seconds for day in report.days)))
+                break_var.set(format_duration(report.break_seconds))
 
             scope_var.set(_scope_title(current_view, current_date))
             today_button.configure(
@@ -392,7 +392,16 @@ class _ReportWindowUI:
 def _normalize_date(view: ReportView, target_date: date) -> date:
     if view == ReportView.WEEK:
         return target_date - timedelta(days=target_date.weekday())
+    if target_date.weekday() >= 5:
+        return target_date - timedelta(days=target_date.weekday() - 4)
     return target_date
+
+
+def _move_workday(current_date: date, direction: int) -> date:
+    next_date = current_date + timedelta(days=direction)
+    while next_date.weekday() >= 5:
+        next_date += timedelta(days=direction)
+    return next_date
 
 
 def _is_today(view: ReportView, current_date: date) -> bool:
@@ -406,7 +415,7 @@ def _is_latest(view: ReportView, current_date: date) -> bool:
 def _scope_title(view: ReportView, current_date: date) -> str:
     if view == ReportView.DAY:
         return _format_date(current_date)
-    week_end = current_date + timedelta(days=6)
+    week_end = current_date + timedelta(days=4)
     return f"Semaine du {_format_date(current_date)} au {_format_date(week_end)}"
 
 
@@ -435,7 +444,8 @@ def _render_daily(text: Any, report: DailyReport) -> None:
 
 def _render_weekly(text: Any, report: WeeklyReport) -> None:
     _clear(text)
-    for index, day in enumerate(report.days):
+    days = tuple(day for day in report.days if date.fromisoformat(day.date).weekday() < 5)
+    for index, day in enumerate(days):
         day_date = date.fromisoformat(day.date)
         tag = f"day-heading-{day.date}"
         text.tag_configure(tag, font=("TkDefaultFont", 10, "bold"), foreground="#175a7a")

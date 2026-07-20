@@ -15,6 +15,7 @@ from bd1.models import DailyReport, Observation, ObservationType, WeeklyReport
 from bd1.report_window import (
     ReportView,
     _is_latest,
+    _move_workday,
     _normalize_date,
     _render_daily,
     _render_weekly,
@@ -49,13 +50,23 @@ class ReportWindowHelpersTest(unittest.TestCase):
             _normalize_date(ReportView.WEEK, date(2026, 7, 8)),
         )
 
+    def test_day_view_normalizes_weekend_to_friday(self) -> None:
+        self.assertEqual(
+            date(2026, 7, 10),
+            _normalize_date(ReportView.DAY, date(2026, 7, 12)),
+        )
+
+    def test_day_navigation_skips_weekend(self) -> None:
+        self.assertEqual(date(2026, 7, 13), _move_workday(date(2026, 7, 10), 1))
+        self.assertEqual(date(2026, 7, 10), _move_workday(date(2026, 7, 13), -1))
+
     def test_scope_title_describes_day_and_week(self) -> None:
         current = date(2026, 7, 10)
         week_start = _normalize_date(ReportView.WEEK, current)
 
         self.assertEqual("vendredi 10 juillet 2026", _scope_title(ReportView.DAY, current))
         self.assertEqual(
-            "Semaine du lundi 6 juillet 2026 au dimanche 12 juillet 2026",
+            "Semaine du lundi 6 juillet 2026 au vendredi 10 juillet 2026",
             _scope_title(ReportView.WEEK, week_start),
         )
 
@@ -91,6 +102,29 @@ class ReportWindowHelpersTest(unittest.TestCase):
             self.assertNotIn("Qualité des données", rendered)
             self.assertNotIn("Application stopped before", rendered)
             self.assertNotIn("No shutdown observation", rendered)
+
+    def test_week_view_hides_weekend_days(self) -> None:
+        weekday = DailyReport(
+            date="2026-07-10",
+            observations=(),
+            work_blocks=(),
+            break_blocks=(),
+            anomalies=(),
+        )
+        weekend = DailyReport(
+            date="2026-07-11",
+            observations=(),
+            work_blocks=(),
+            break_blocks=(),
+            anomalies=(),
+        )
+        text = TextBuffer()
+
+        _render_weekly(text, WeeklyReport("2026-07-06", (weekday, weekend)))
+
+        rendered = text.rendered()
+        self.assertIn("vendredi 10 juillet 2026", rendered)
+        self.assertNotIn("samedi 11 juillet 2026", rendered)
 
 
 if __name__ == "__main__":
