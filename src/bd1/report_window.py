@@ -541,6 +541,43 @@ def _render_weekly(text: Any, report: WeeklyReport) -> None:
         if index < len(report.days) - 1:
             _insert_line(text, "", "muted")
 
+    _insert_weekly_declaration(text, report)
+
+
+def _insert_weekly_declaration(text: Any, report: WeeklyReport) -> None:
+    declaration = report.declaration
+    _insert_section(text, "Déclaration proposée")
+    _insert_line(text, f"Cible : {format_duration(declaration.target_seconds)}")
+    _insert_line(text, f"Temps estimé BD-1 : {format_duration(declaration.estimated_seconds)}")
+    if declaration.excess_seconds > 0:
+        _insert_line(
+            text,
+            f"Alerte : dépassement de {format_duration(declaration.excess_seconds)}.",
+            "break",
+        )
+        _insert_line(text, "Horaires proposés pour déclarer 37 h :")
+        for day in declaration.proposed_days:
+            if day.worked_seconds == 0:
+                continue
+            day_date = date.fromisoformat(day.date)
+            _insert_line(text, f"{_format_date(day_date)} : {format_duration(day.worked_seconds)}")
+            for block in day.work_blocks:
+                _insert_block(text, block, indent="  ")
+        _insert_line(
+            text,
+            f"Total proposé : {format_duration(declaration.proposed_seconds)}",
+            "work",
+        )
+    elif declaration.remaining_seconds > 0:
+        _insert_line(
+            text,
+            f"Reste à déclarer pour atteindre 37 h : "
+            f"{format_duration(declaration.remaining_seconds)}",
+            "muted",
+        )
+    else:
+        _insert_line(text, "La semaine est exactement à la cible.", "work")
+
 
 def _sorted_blocks(report: DailyReport) -> tuple[TimeBlock, ...]:
     return tuple(sorted((*report.work_blocks, *report.break_blocks), key=lambda block: block.start))

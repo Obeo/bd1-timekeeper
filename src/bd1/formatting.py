@@ -63,7 +63,40 @@ def format_weekly_report(report: WeeklyReport) -> str:
             lines.append(f"  - {anomaly}")
         lines.append("")
     lines.append(f"Weekly total: {format_duration(report.worked_seconds)}")
+    _append_weekly_declaration(lines, report)
     return "\n".join(lines)
+
+
+def _append_weekly_declaration(lines: list[str], report: WeeklyReport) -> None:
+    declaration = report.declaration
+    lines.extend(
+        [
+            "",
+            "Suggested declaration:",
+            f"- Target: {format_duration(declaration.target_seconds)}",
+            f"- Estimated: {format_duration(declaration.estimated_seconds)}",
+        ]
+    )
+    if declaration.excess_seconds > 0:
+        lines.append(f"- Alert: {format_duration(declaration.excess_seconds)} above target")
+    elif declaration.remaining_seconds > 0:
+        lines.append(
+            f"- Remaining to reach target: {format_duration(declaration.remaining_seconds)}"
+        )
+    else:
+        lines.append("- On target")
+
+    if declaration.excess_seconds <= 0:
+        return
+
+    lines.append("")
+    lines.append("Proposed worked blocks capped at target:")
+    for day in declaration.proposed_days:
+        if day.worked_seconds == 0:
+            continue
+        lines.append(f"{day.date}: {format_duration(day.worked_seconds)} proposed")
+        _append_timeline_blocks(lines, day.work_blocks, (), prefix="  ")
+    lines.append(f"Proposed weekly total: {format_duration(declaration.proposed_seconds)}")
 
 
 def _append_timeline_blocks(
