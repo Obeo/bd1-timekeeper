@@ -30,6 +30,7 @@ BREAK_START_EVENTS = {
 DAY_END_EVENTS = {ObservationType.SHUTDOWN}
 LATE_APP_START_AFTER_BOOT_SECONDS = 60 * 60
 SHORT_AUTOMATIC_RESUME_SECONDS = 5 * 60
+WORK_BLOCK_MERGE_GAP_SECONDS = 2 * 60
 LUNCH_START = time(12, 0)
 LUNCH_END = time(14, 0)
 DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME = time(13, 58)
@@ -179,7 +180,7 @@ class ReportAnalyzer:
         return DailyReport(
             date=day.isoformat(),
             observations=ordered,
-            work_blocks=tuple(work_blocks),
+            work_blocks=self._merge_close_work_blocks(work_blocks, break_blocks),
             break_blocks=tuple(break_blocks),
             anomalies=tuple(anomalies),
         )
@@ -228,6 +229,32 @@ class ReportAnalyzer:
             work_blocks.append(block)
         elif label == "break":
             break_blocks.append(block)
+
+    @staticmethod
+    def _merge_close_work_blocks(
+        work_blocks: list[TimeBlock],
+        break_blocks: list[TimeBlock],
+    ) -> tuple[TimeBlock, ...]:
+        if not work_blocks:
+            return ()
+
+        merged = [work_blocks[0]]
+        for block in work_blocks[1:]:
+            previous = merged[-1]
+            gap_seconds = (block.start - previous.end).total_seconds()
+            has_break_between = any(
+                break_block.start < block.start and break_block.end > previous.end
+                for break_block in break_blocks
+            )
+            if 0 <= gap_seconds < WORK_BLOCK_MERGE_GAP_SECONDS and not has_break_between:
+                merged[-1] = TimeBlock(
+                    label="work",
+                    start=previous.start,
+                    end=max(previous.end, block.end),
+                )
+            else:
+                merged.append(block)
+        return tuple(merged)
 
     def _is_protected_lunch_resume(self, observed_at: datetime) -> bool:
         return LUNCH_START <= observed_at.time() < self.lunch_automatic_work_resume

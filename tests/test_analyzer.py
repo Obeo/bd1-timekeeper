@@ -289,6 +289,36 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("12:00", report.work_blocks[0].end.strftime("%H:%M"))
         self.assertEqual("17:00", report.work_blocks[1].start.strftime("%H:%M"))
 
+    def test_app_restart_within_two_minutes_merges_work_blocks(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:00:00+02:00", ObservationType.APP_STOPPED),
+            obs("2026-07-08T12:01:00+02:00", ObservationType.APP_STARTED),
+            obs("2026-07-08T12:01:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual(1, len(report.work_blocks))
+        self.assertEqual("09:00", report.work_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("18:00", report.work_blocks[0].end.strftime("%H:%M"))
+
+    def test_app_restart_after_two_minutes_keeps_work_blocks_separate(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:00:00+02:00", ObservationType.APP_STOPPED),
+            obs("2026-07-08T12:02:00+02:00", ObservationType.APP_STARTED),
+            obs("2026-07-08T12:02:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual(2, len(report.work_blocks))
+
     def test_reboot_after_workday_does_not_extend_the_previous_session(self) -> None:
         day = date(2026, 7, 10)
         observations = [
