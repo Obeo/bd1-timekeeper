@@ -95,6 +95,32 @@ class ObservationStoreTest(unittest.TestCase):
         self.assertEqual(ObservationType.FIRST_ACTIVITY, observations[0].type)
         self.assertEqual(ObservationType.SHUTDOWN, observations[1].type)
 
+    def test_deletes_observations_for_one_day_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                store.add(
+                    ObservationType.FIRST_ACTIVITY,
+                    datetime.fromisoformat("2026-07-08T09:00:00+02:00"),
+                )
+                store.add(
+                    ObservationType.FIRST_ACTIVITY,
+                    datetime.fromisoformat("2026-07-09T09:00:00+02:00"),
+                )
+                store.add(
+                    ObservationType.SHUTDOWN,
+                    datetime.fromisoformat("2026-07-09T18:00:00+02:00"),
+                )
+
+                deleted_count = store.delete_for_day(date(2026, 7, 9))
+                remaining_observations = store.list_all()
+            finally:
+                store.close()
+
+        self.assertEqual(2, deleted_count)
+        self.assertEqual(1, len(remaining_observations))
+        self.assertEqual(date(2026, 7, 8), remaining_observations[0].observed_at.date())
+
 
 if __name__ == "__main__":
     unittest.main()

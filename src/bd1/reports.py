@@ -46,6 +46,9 @@ class ReportService:
         target_day = day or date.today()
         return self.analyzer.build_weekly(target_day, self.store.list_for_week(target_day))
 
+    def delete_day(self, day: date) -> int:
+        return self.store.delete_for_day(day)
+
     def all_time_correction_seconds(self) -> int:
         today = self._today_provider()
         period_start = correction_period_start(today)
