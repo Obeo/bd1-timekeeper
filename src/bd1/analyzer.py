@@ -49,7 +49,9 @@ class ReportAnalyzer:
 
     def build_daily(self, day: date, observations: Iterable[Observation]) -> DailyReport:
         ordered = tuple(sorted(observations, key=lambda item: (item.observed_at, item.id or 0)))
-        interpreted = self._with_boot_as_work_start_when_app_started_late(ordered)
+        interpreted = self._with_boot_as_work_start_when_app_started_late(
+            self._with_idle_start_at_threshold(ordered)
+        )
         work_blocks: list[TimeBlock] = []
         break_blocks: list[TimeBlock] = []
         anomalies: list[str] = []
@@ -388,6 +390,35 @@ class ReportAnalyzer:
             )
 
         return observations
+
+    @staticmethod
+    def _with_idle_start_at_threshold(
+        observations: tuple[Observation, ...],
+    ) -> tuple[Observation, ...]:
+        adjusted: list[Observation] = []
+        for observation in observations:
+            threshold_crossed_at = (observation.metadata or {}).get("threshold_crossed_at")
+            if observation.type != ObservationType.IDLE_STARTED or not threshold_crossed_at:
+                adjusted.append(observation)
+                continue
+            try:
+                idle_started_at = datetime.fromisoformat(str(threshold_crossed_at))
+            except ValueError:
+                adjusted.append(observation)
+                continue
+            if idle_started_at <= observation.observed_at:
+                adjusted.append(observation)
+                continue
+            adjusted.append(
+                Observation(
+                    observed_at=idle_started_at,
+                    type=observation.type,
+                    metadata=observation.metadata,
+                    id=observation.id,
+                )
+            )
+
+        return tuple(sorted(adjusted, key=lambda item: (item.observed_at, item.id or 0)))
 
     @staticmethod
     def _should_insert_default_lunch_break(
