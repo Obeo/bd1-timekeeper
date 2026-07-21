@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import suppress
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from enum import StrEnum
 from multiprocessing import get_context
@@ -20,8 +21,15 @@ from typing import Any, Literal
 
 from bd1.calendar import is_working_day
 from bd1.formatting import format_duration
-from bd1.models import DailyReport, Observation, ObservationType, TimeBlock, WeeklyReport
+from bd1.models import (
+    DailyReport,
+    Observation,
+    ObservationType,
+    TimeBlock,
+    WeeklyReport,
+)
 from bd1.reports import ReportService
+from bd1.settings import DEFAULT_WEEKLY_CAP_HOURS, Settings, load_settings, save_settings
 
 
 class ReportView(StrEnum):
@@ -138,6 +146,7 @@ def _run_report_window_process(
                 store,
                 lunch_automatic_work_resume=settings.lunch_automatic_work_resume,
             ),
+            settings,
             initial_view,
             initial_date,
             commands,
@@ -152,11 +161,13 @@ class _ReportWindowUI:
     def __init__(
         self,
         report_service: ReportService,
+        settings: Settings,
         initial_view: ReportView,
         initial_date: date,
         commands: Any,
     ) -> None:
         self.report_service = report_service
+        self.settings = settings
         self.initial_view = initial_view
         self.initial_date = initial_date
         self._commands = commands
@@ -180,6 +191,7 @@ class _ReportWindowUI:
         correction_var = tk.StringVar()
         correction_explanation_var = tk.StringVar()
         status_message_var = tk.StringVar()
+        weekly_cap_var = tk.BooleanVar(value=self.settings.weekly_37h_cap_enabled)
 
         root.columnconfigure(0, weight=1)
         root.rowconfigure(3, weight=1)
@@ -293,7 +305,17 @@ class _ReportWindowUI:
 
         footer = tk.Frame(root, padx=16, pady=4)
         footer.grid(row=4, column=0, sticky="ew", pady=(6, 10))
-        tk.Label(footer, textvariable=status_message_var, anchor="w").pack(side="left")
+        footer_left = tk.Frame(footer)
+        footer_left.pack(side="left")
+        status_label = tk.Label(footer_left, textvariable=status_message_var, anchor="w")
+        status_label.pack(side="left")
+        weekly_cap_button = tk.Checkbutton(
+            footer_left,
+            text=f"Plafond {self.settings.weekly_cap_hours}h",
+            variable=weekly_cap_var,
+            command=lambda: toggle_weekly_cap(),
+        )
+        weekly_cap_button.pack(side="left", before=status_label, padx=(0, 12))
         delete_button = tk.Button(
             footer,
             text="Supprimer la journée",
@@ -346,6 +368,12 @@ class _ReportWindowUI:
 
         def go_to_today() -> None:
             set_view(current_view, date.today())
+
+        def toggle_weekly_cap() -> None:
+            enabled = weekly_cap_var.get()
+            save_settings(replace(load_settings(), weekly_37h_cap_enabled=enabled))
+            self.settings = replace(self.settings, weekly_37h_cap_enabled=enabled)
+            render()
 
         def delete_current_day() -> None:
             if current_view != ReportView.DAY:
@@ -409,8 +437,18 @@ class _ReportWindowUI:
                 break_var.set(format_duration(report.break_seconds))
             else:
                 report = self.report_service.weekly(current_date)
-                _render_weekly(text, report)
-                worked_var.set(format_duration(report.worked_seconds))
+                _render_weekly(
+                    text,
+                    report,
+                    apply_weekly_cap=self.settings.weekly_37h_cap_enabled,
+                    weekly_cap_hours=self.settings.weekly_cap_hours,
+                )
+                worked_seconds = (
+                    report.declaration_for(self.settings.weekly_cap_hours).proposed_seconds
+                    if self.settings.weekly_37h_cap_enabled
+                    else report.worked_seconds
+                )
+                worked_var.set(format_duration(worked_seconds))
                 break_var.set(format_duration(report.break_seconds))
             correction_seconds = self.report_service.all_time_correction_seconds()
             correction_var.set(format_correction(correction_seconds))
@@ -423,6 +461,10 @@ class _ReportWindowUI:
             next_button.configure(
                 state="disabled" if _is_latest(current_view, current_date) else "normal"
             )
+            if current_view == ReportView.WEEK:
+                weekly_cap_button.pack(side="left", before=status_label, padx=(0, 12))
+            else:
+                weekly_cap_button.pack_forget()
             delete_button.configure(
                 state="normal" if current_view == ReportView.DAY else "disabled"
             )
@@ -518,9 +560,16 @@ def _render_daily(text: Any, report: DailyReport) -> None:
         _insert_line(text, "Aucune information.", "muted")
 
 
-def _render_weekly(text: Any, report: WeeklyReport) -> None:
+def _render_weekly(
+    text: Any,
+    report: WeeklyReport,
+    apply_weekly_cap: bool = False,
+    weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS,
+) -> None:
     _clear(text)
-    days = tuple(day for day in report.days if is_working_day(date.fromisoformat(day.date)))
+    declaration = report.declaration_for(weekly_cap_hours) if apply_weekly_cap else None
+    report_days = declaration.proposed_days if declaration is not None else report.days
+    days = tuple(day for day in report_days if is_working_day(date.fromisoformat(day.date)))
     for index, day in enumerate(days):
         day_date = date.fromisoformat(day.date)
         tag = f"day-heading-{day.date}"
@@ -538,7 +587,7 @@ def _render_weekly(text: Any, report: WeeklyReport) -> None:
                     _insert_block(text, block, indent="  ")
             else:
                 _insert_line(text, "Aucune plage interprétée.", "muted")
-        if index < len(report.days) - 1:
+        if index < len(days) - 1:
             _insert_line(text, "", "muted")
 
 

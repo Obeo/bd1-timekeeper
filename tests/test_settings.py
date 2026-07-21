@@ -14,7 +14,7 @@ import unittest
 from datetime import time
 from pathlib import Path
 
-from bd1.settings import Settings, load_settings, save_settings
+from bd1.settings import DEFAULT_WEEKLY_CAP_HOURS, Settings, load_settings, save_settings
 
 
 class SettingsTest(unittest.TestCase):
@@ -50,6 +50,37 @@ class SettingsTest(unittest.TestCase):
 
         self.assertEqual("13:45", loaded.lunch_automatic_work_resume_time)
         self.assertEqual(time(13, 45), loaded.lunch_automatic_work_resume)
+
+    def test_weekly_37h_cap_is_disabled_by_default(self) -> None:
+        self.assertFalse(Settings().weekly_37h_cap_enabled)
+
+    def test_round_trips_weekly_37h_cap(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            save_settings(Settings(weekly_37h_cap_enabled=True), path)
+            loaded = load_settings(path)
+
+        self.assertTrue(loaded.weekly_37h_cap_enabled)
+
+    def test_weekly_cap_hours_defaults_to_37(self) -> None:
+        self.assertEqual(DEFAULT_WEEKLY_CAP_HOURS, Settings().weekly_cap_hours)
+
+    def test_round_trips_weekly_cap_hours(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            save_settings(Settings(weekly_cap_hours=20), path)
+            loaded = load_settings(path)
+
+        self.assertEqual(20, loaded.weekly_cap_hours)
+
+    def test_invalid_weekly_cap_hours_keeps_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text(json.dumps({"weekly_cap_hours": 0}), encoding="utf-8")
+
+            settings = load_settings(path)
+
+        self.assertEqual(DEFAULT_WEEKLY_CAP_HOURS, settings.weekly_cap_hours)
 
     def test_invalid_lunch_automatic_work_resume_time_keeps_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

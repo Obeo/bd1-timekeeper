@@ -19,6 +19,7 @@ from multiprocessing import freeze_support
 from bd1.formatting import format_daily_report, format_weekly_report
 from bd1.models import ObservationType
 from bd1.reports import ReportService
+from bd1.settings import load_settings
 from bd1.storage import ObservationStore
 
 
@@ -74,8 +75,6 @@ def main() -> None:
             store.add(ObservationType.USER_BREAK, metadata={"source": "cli"})
             return
         if args.report:
-            from bd1.settings import load_settings
-
             settings = load_settings()
             target_date = _parse_date(args.date)
             reports = ReportService(
@@ -85,13 +84,18 @@ def main() -> None:
             if args.report == "today":
                 print(format_daily_report(reports.daily(target_date)))
             else:
-                print(format_weekly_report(reports.weekly(target_date)))
+                print(
+                    format_weekly_report(
+                        reports.weekly(target_date),
+                        apply_weekly_cap=settings.weekly_37h_cap_enabled,
+                        weekly_cap_hours=settings.weekly_cap_hours,
+                    )
+                )
             return
 
         try:
             _configure_tray_backend()
             from bd1.app import BD1Application
-            from bd1.settings import load_settings
         except ModuleNotFoundError as error:
             if error.name in {"PIL", "pynput", "pystray"}:
                 print(

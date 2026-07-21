@@ -11,7 +11,14 @@ from __future__ import annotations
 from datetime import datetime
 
 from bd1.calendar import is_working_day
-from bd1.models import DailyReport, Observation, ObservationType, TimeBlock, WeeklyReport
+from bd1.models import (
+    WEEKLY_DECLARATION_TARGET_HOURS,
+    DailyReport,
+    Observation,
+    ObservationType,
+    TimeBlock,
+    WeeklyReport,
+)
 
 
 def format_duration(seconds: int) -> str:
@@ -47,9 +54,15 @@ def format_daily_report(report: DailyReport) -> str:
     return "\n".join(lines)
 
 
-def format_weekly_report(report: WeeklyReport) -> str:
+def format_weekly_report(
+    report: WeeklyReport,
+    apply_weekly_cap: bool = False,
+    weekly_cap_hours: int = WEEKLY_DECLARATION_TARGET_HOURS,
+) -> str:
     lines = [f"BD-1 weekly report - week of {report.week_start}", ""]
-    for day in report.days:
+    declaration = report.declaration_for(weekly_cap_hours) if apply_weekly_cap else None
+    days = declaration.proposed_days if declaration is not None else report.days
+    for day in days:
         if not is_working_day(datetime.fromisoformat(day.date).date()):
             continue
         if not day.observations:
@@ -62,7 +75,10 @@ def format_weekly_report(report: WeeklyReport) -> str:
         for anomaly in day.anomalies:
             lines.append(f"  - {anomaly}")
         lines.append("")
-    lines.append(f"Weekly total: {format_duration(report.worked_seconds)}")
+    worked_seconds = (
+        declaration.proposed_seconds if declaration is not None else report.worked_seconds
+    )
+    lines.append(f"Weekly total: {format_duration(worked_seconds)}")
     return "\n".join(lines)
 
 
