@@ -8,13 +8,32 @@
 
 from __future__ import annotations
 
+import importlib
+import sys
 import unittest
+from types import ModuleType
+from unittest.mock import patch
 
-from bd1.activity import ActivityMonitor
+
+def _activity_monitor_type() -> type:
+    pynput = ModuleType("pynput")
+    pynput.keyboard = ModuleType("pynput.keyboard")
+    pynput.mouse = ModuleType("pynput.mouse")
+    with patch.dict(
+        sys.modules,
+        {
+            "pynput": pynput,
+            "pynput.keyboard": pynput.keyboard,
+            "pynput.mouse": pynput.mouse,
+        },
+    ):
+        module = importlib.import_module("bd1.activity")
+    return module.ActivityMonitor
 
 
 class ActivityMonitorMeetingTest(unittest.TestCase):
     def test_meeting_microphone_activity_is_detected_when_enabled(self) -> None:
+        ActivityMonitor = _activity_monitor_type()
         monitor = ActivityMonitor.__new__(ActivityMonitor)
         monitor.meeting_activity_detection_enabled = True
         monitor.meeting_process_names = ("zoom",)
@@ -23,6 +42,7 @@ class ActivityMonitorMeetingTest(unittest.TestCase):
         self.assertTrue(monitor._has_meeting_microphone_activity())
 
     def test_meeting_microphone_activity_is_ignored_when_disabled(self) -> None:
+        ActivityMonitor = _activity_monitor_type()
         monitor = ActivityMonitor.__new__(ActivityMonitor)
         monitor.meeting_activity_detection_enabled = False
         monitor.meeting_process_names = ("zoom",)
