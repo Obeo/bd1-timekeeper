@@ -100,7 +100,6 @@ def main() -> None:
         if args.observe:
             try:
                 from bd1.observer import run_headless_observer
-                from bd1.settings import load_settings
             except ModuleNotFoundError as error:
                 if error.name == "pynput":
                     print(
