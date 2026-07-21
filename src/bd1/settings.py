@@ -19,6 +19,14 @@ DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME_TIME = "13:58"
 LUNCH_AUTOMATIC_WORK_RESUME_TIME_MIN = "12:00"
 LUNCH_AUTOMATIC_WORK_RESUME_TIME_MAX = "14:00"
 DEFAULT_WEEKLY_CAP_HOURS = 37
+DEFAULT_MEETING_PROCESS_NAMES = (
+    "zoom",
+    "teams",
+    "ms-teams",
+    "chrome",
+    "chromium",
+    "firefox",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +41,8 @@ class Settings:
     lunch_automatic_work_resume_time: str = DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME_TIME
     weekly_37h_cap_enabled: bool = False
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS
+    meeting_activity_detection_enabled: bool = True
+    meeting_process_names: tuple[str, ...] = DEFAULT_MEETING_PROCESS_NAMES
 
     @property
     def idle_threshold_seconds(self) -> int:
@@ -57,12 +67,11 @@ def load_settings(path: Path | None = None) -> Settings:
     allowed = {field.name for field in Settings.__dataclass_fields__.values()}
     data = {key: value for key, value in raw.items() if key in allowed}
     if "idle_ignored_process_names" in data:
-        names = data["idle_ignored_process_names"]
-        if isinstance(names, str):
-            names = (names,)
-        elif not isinstance(names, (list, tuple)):
-            names = ()
-        data["idle_ignored_process_names"] = tuple(str(name) for name in names if str(name))
+        data["idle_ignored_process_names"] = _normalize_string_tuple(
+            data["idle_ignored_process_names"]
+        )
+    if "meeting_process_names" in data:
+        data["meeting_process_names"] = _normalize_string_tuple(data["meeting_process_names"])
     if "lunch_automatic_work_resume_time" in data:
         data["lunch_automatic_work_resume_time"] = normalize_lunch_automatic_work_resume_time(
             data["lunch_automatic_work_resume_time"],
@@ -106,3 +115,13 @@ def normalize_weekly_cap_hours(value: object, default: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         return default
     return value
+
+
+def _normalize_string_tuple(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        values = (value,)
+    elif isinstance(value, (list, tuple)):
+        values = value
+    else:
+        values = ()
+    return tuple(str(item) for item in values if str(item))

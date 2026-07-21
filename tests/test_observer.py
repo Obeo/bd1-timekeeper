@@ -72,6 +72,8 @@ class HeadlessObserverTest(unittest.TestCase):
                         idle_threshold_minutes=12,
                         activity_poll_seconds=3.0,
                         idle_ignored_process_names=("Zoom.exe",),
+                        meeting_activity_detection_enabled=False,
+                        meeting_process_names=("chrome",),
                     ),
                     store,
                     printer=lambda _: None,
@@ -86,6 +88,8 @@ class HeadlessObserverTest(unittest.TestCase):
         self.assertEqual(12 * 60, fake_monitor.last_kwargs["idle_threshold_seconds"])
         self.assertEqual(3.0, fake_monitor.last_kwargs["poll_seconds"])
         self.assertEqual(("Zoom.exe",), fake_monitor.last_kwargs["idle_ignored_process_names"])
+        self.assertFalse(fake_monitor.last_kwargs["meeting_activity_detection_enabled"])
+        self.assertEqual(("chrome",), fake_monitor.last_kwargs["meeting_process_names"])
 
     def test_run_headless_observer_exits_when_lock_is_held(self) -> None:
         messages: list[str] = []

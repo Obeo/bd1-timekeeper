@@ -28,6 +28,20 @@ class SettingsTest(unittest.TestCase):
 
         self.assertEqual(("aomhost64.exe", "Teams.exe"), loaded.idle_ignored_process_names)
 
+    def test_round_trips_meeting_activity_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            settings = Settings(
+                meeting_activity_detection_enabled=False,
+                meeting_process_names=("zoom", "chrome"),
+            )
+
+            save_settings(settings, path)
+            loaded = load_settings(path)
+
+        self.assertFalse(loaded.meeting_activity_detection_enabled)
+        self.assertEqual(("zoom", "chrome"), loaded.meeting_process_names)
+
     def test_missing_idle_ignored_process_names_keeps_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "settings.json"
