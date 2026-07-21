@@ -28,6 +28,14 @@ DEFAULT_VPN_INTERFACE_PATTERNS = (
     "*wintun*",
     "*tap-windows*",
 )
+DEFAULT_MEETING_PROCESS_NAMES = (
+    "zoom",
+    "teams",
+    "ms-teams",
+    "chrome",
+    "chromium",
+    "firefox",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +52,8 @@ class Settings:
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS
     mattermost_url: str = ""
     vpn_interface_patterns: tuple[str, ...] = DEFAULT_VPN_INTERFACE_PATTERNS
+    meeting_activity_detection_enabled: bool = True
+    meeting_process_names: tuple[str, ...] = DEFAULT_MEETING_PROCESS_NAMES
 
     @property
     def idle_threshold_seconds(self) -> int:
@@ -67,7 +77,7 @@ def load_settings(path: Path | None = None) -> Settings:
         raw = json.load(file)
     allowed = {field.name for field in Settings.__dataclass_fields__.values()}
     data = {key: value for key, value in raw.items() if key in allowed}
-    for key in ("idle_ignored_process_names", "vpn_interface_patterns"):
+    for key in ("idle_ignored_process_names", "vpn_interface_patterns", "meeting_process_names"):
         if key not in data:
             continue
         names = data[key]
@@ -123,3 +133,13 @@ def normalize_weekly_cap_hours(value: object, default: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         return default
     return value
+
+
+def _normalize_string_tuple(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        values = (value,)
+    elif isinstance(value, (list, tuple)):
+        values = value
+    else:
+        values = ()
+    return tuple(str(item) for item in values if str(item))

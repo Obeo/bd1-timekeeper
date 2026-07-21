@@ -18,11 +18,13 @@ from typing import Any
 
 from pynput import keyboard, mouse
 
+from bd1.audio_activity import is_microphone_used_by
 from bd1.models import ObservationType
 from bd1.processes import is_any_process_running
 
 ObservationCallback = Callable[[ObservationType, datetime | None, dict[str, object] | None], None]
 ProcessRunningChecker = Callable[[tuple[str, ...]], bool]
+MicrophoneActivityChecker = Callable[[tuple[str, ...]], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,13 +41,19 @@ class ActivityMonitor:
         callback: ObservationCallback,
         poll_seconds: float = 10.0,
         idle_ignored_process_names: tuple[str, ...] = (),
+        meeting_activity_detection_enabled: bool = True,
+        meeting_process_names: tuple[str, ...] = (),
         process_running_checker: ProcessRunningChecker = is_any_process_running,
+        microphone_activity_checker: MicrophoneActivityChecker = is_microphone_used_by,
     ) -> None:
         self.idle_threshold_seconds = idle_threshold_seconds
         self.poll_seconds = poll_seconds
         self.callback = callback
         self.idle_ignored_process_names = idle_ignored_process_names
+        self.meeting_activity_detection_enabled = meeting_activity_detection_enabled
+        self.meeting_process_names = meeting_process_names
         self.process_running_checker = process_running_checker
+        self.microphone_activity_checker = microphone_activity_checker
         self._last_activity_monotonic = time.monotonic()
         self._last_activity_at = datetime.now().astimezone()
         self._seen_activity = False
@@ -104,7 +112,10 @@ class ActivityMonitor:
                     idle_seconds = time.monotonic() - self._last_activity_monotonic
                     if idle_seconds < self.idle_threshold_seconds:
                         continue
-                    if self._has_ignored_process_running():
+                    if (
+                        self._has_ignored_process_running()
+                        or self._has_meeting_microphone_activity()
+                    ):
                         self._last_activity_monotonic = time.monotonic()
                         self._last_activity_at = datetime.now().astimezone()
                         continue
@@ -153,5 +164,13 @@ class ActivityMonitor:
             return False
         try:
             return self.process_running_checker(self.idle_ignored_process_names)
+        except Exception:
+            return False
+
+    def _has_meeting_microphone_activity(self) -> bool:
+        if not self.meeting_activity_detection_enabled or not self.meeting_process_names:
+            return False
+        try:
+            return self.microphone_activity_checker(self.meeting_process_names)
         except Exception:
             return False

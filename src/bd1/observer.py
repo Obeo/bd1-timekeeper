@@ -104,6 +104,8 @@ class HeadlessObserver:
             callback=self.add_observation,
             poll_seconds=self.settings.activity_poll_seconds,
             idle_ignored_process_names=self.settings.idle_ignored_process_names,
+            meeting_activity_detection_enabled=self.settings.meeting_activity_detection_enabled,
+            meeting_process_names=self.settings.meeting_process_names,
         )
         self._monitor.start()
 
