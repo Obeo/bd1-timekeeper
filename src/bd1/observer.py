@@ -15,12 +15,14 @@ from datetime import datetime
 
 from bd1.models import ObservationType
 from bd1.settings import Settings
+from bd1.single_instance import SingleInstanceLock
 from bd1.state import StateMachine
 from bd1.storage import ObservationStore
 from bd1.system import system_boot_time
 
 ObserverPrinter = Callable[[str], None]
 BootTimeProvider = Callable[[], datetime]
+OBSERVER_LOCK_NAME = "BD1TimekeeperHeadlessObserver"
 
 
 class HeadlessObserver:
@@ -133,5 +135,13 @@ def run_headless_observer(
     settings: Settings,
     store: ObservationStore,
     printer: ObserverPrinter = print,
+    lock: SingleInstanceLock | None = None,
 ) -> None:
-    HeadlessObserver(settings, store, printer).run()
+    instance_lock = lock or SingleInstanceLock(OBSERVER_LOCK_NAME)
+    if not instance_lock.acquire():
+        printer("BD-1 observe est déjà lancé.")
+        return
+    try:
+        HeadlessObserver(settings, store, printer).run()
+    finally:
+        instance_lock.release()

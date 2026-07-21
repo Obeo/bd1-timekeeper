@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -16,6 +18,19 @@ from bd1.single_instance import SingleInstanceLock
 
 
 class SingleInstanceLockTest(unittest.TestCase):
+    def test_file_lock_prevents_duplicate_non_windows_instances(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bd1.lock"
+            first = SingleInstanceLock(lock_path=path)
+            second = SingleInstanceLock(lock_path=path)
+
+            try:
+                self.assertTrue(first.acquire())
+                self.assertFalse(second.acquire())
+            finally:
+                first.release()
+                second.release()
+
     def test_windows_mutex_creation_failure_fails_closed(self) -> None:
         kernel32 = Mock()
         kernel32.CreateMutexW.return_value = 0
