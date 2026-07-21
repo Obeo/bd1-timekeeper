@@ -18,7 +18,7 @@ from typing import ClassVar
 from unittest.mock import patch
 
 from bd1.models import ObservationType
-from bd1.observer import HeadlessObserver
+from bd1.observer import HeadlessObserver, run_headless_observer
 from bd1.settings import Settings
 from bd1.storage import ObservationStore
 
@@ -87,6 +87,27 @@ class HeadlessObserverTest(unittest.TestCase):
         self.assertEqual(3.0, fake_monitor.last_kwargs["poll_seconds"])
         self.assertEqual(("Zoom.exe",), fake_monitor.last_kwargs["idle_ignored_process_names"])
 
+    def test_run_headless_observer_exits_when_lock_is_held(self) -> None:
+        messages: list[str] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                run_headless_observer(
+                    Settings(),
+                    store,
+                    printer=messages.append,
+                    lock=FakeLock(acquired=False),
+                )
+                observations = store.list_between(
+                    datetime.fromisoformat("2026-07-20T00:00:00+02:00"),
+                    datetime.now().astimezone() + timedelta(days=1),
+                )
+            finally:
+                store.close()
+
+        self.assertEqual([], list(observations))
+        self.assertEqual(["BD-1 observe est déjà lancé."], messages)
+
 
 def _activity_module() -> ModuleType:
     activity_module = ModuleType("bd1.activity")
@@ -107,6 +128,18 @@ class FakeActivityMonitor:
 
     def stop(self) -> None:
         self.stopped = True
+
+
+class FakeLock:
+    def __init__(self, acquired: bool) -> None:
+        self.acquired = acquired
+        self.released = False
+
+    def acquire(self) -> bool:
+        return self.acquired
+
+    def release(self) -> None:
+        self.released = True
 
 
 if __name__ == "__main__":
