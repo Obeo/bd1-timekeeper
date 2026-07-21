@@ -11,7 +11,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 from typing import ClassVar
@@ -42,7 +42,10 @@ class HeadlessObserverTest(unittest.TestCase):
                 with patch.dict(sys.modules, {"bd1.activity": _activity_module()}):
                     observer.run()
 
-                observations = store.list_for_day(boot_time.date())
+                observations = store.list_between(
+                    boot_time,
+                    datetime.now().astimezone() + timedelta(days=1),
+                )
             finally:
                 store.close()
 
