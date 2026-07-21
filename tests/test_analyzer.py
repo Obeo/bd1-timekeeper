@@ -86,6 +86,26 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("09:00", report.work_blocks[0].start.strftime("%H:%M"))
         self.assertEqual("12:00", report.work_blocks[0].end.strftime("%H:%M"))
 
+    def test_automatic_idle_break_starts_when_threshold_is_crossed(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T10:01:23+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs(
+                "2026-07-08T10:01:26+02:00",
+                ObservationType.IDLE_STARTED,
+                {"threshold_crossed_at": "2026-07-08T10:17:26+02:00"},
+            ),
+            obs("2026-07-08T10:22:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T10:27:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual("10:01", report.work_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("10:17", report.work_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("10:17", report.break_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("10:22", report.break_blocks[0].end.strftime("%H:%M"))
+
     def test_automatic_lunch_resume_before_1358_keeps_break_until_1358(self) -> None:
         day = date(2026, 7, 8)
         observations = [
@@ -395,10 +415,15 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual((), report.work_blocks)
 
 
-def obs(value: str, observation_type: ObservationType) -> Observation:
+def obs(
+    value: str,
+    observation_type: ObservationType,
+    metadata: dict[str, object] | None = None,
+) -> Observation:
     return Observation(
         observed_at=datetime.fromisoformat(value).astimezone(PARIS),
         type=observation_type,
+        metadata=metadata,
     )
 
 
