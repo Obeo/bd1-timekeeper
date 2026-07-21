@@ -76,7 +76,8 @@ and `cpthost` on Linux:
   "idle_ignored_process_names": [
     "aomhost64.exe",
     "cpthost"
-  ]
+  ],
+  "weekly_cap_hours": 37
 }
 ```
 
@@ -89,6 +90,13 @@ detects activity during the protected lunch window. For example, if the computer
 wakes up at 13:20 but this value is set to `13:58`, BD-1 keeps the lunch break
 open until 13:58. Use the `HH:MM` format. Missing or invalid values fall back to
 `13:58`. The value must be after `12:00` and no later than `14:00`.
+
+#### weekly_cap_hours
+
+The `weekly_cap_hours` setting controls the weekly target used when the
+`Plafond 37h` option is enabled in the weekly report. It defaults to `37`.
+For local testing, it can be set to a lower value such as `20`. Invalid or
+non-positive values fall back to `37`.
 
 ## Development
 

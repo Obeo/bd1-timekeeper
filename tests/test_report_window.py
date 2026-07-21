@@ -11,7 +11,15 @@ from __future__ import annotations
 import unittest
 from datetime import date, datetime, timedelta
 
-from bd1.models import DailyReport, Observation, ObservationType, WeeklyReport
+from bd1.formatting import format_duration
+from bd1.models import (
+    WEEKLY_DECLARATION_TARGET_SECONDS,
+    DailyReport,
+    Observation,
+    ObservationType,
+    TimeBlock,
+    WeeklyReport,
+)
 from bd1.report_window import (
     ReportView,
     _is_latest,
@@ -142,6 +150,42 @@ class ReportWindowHelpersTest(unittest.TestCase):
         rendered = text.rendered()
         self.assertIn("vendredi 10 juillet 2026", rendered)
         self.assertNotIn("samedi 11 juillet 2026", rendered)
+
+    def test_weekly_declaration_is_opt_in(self) -> None:
+        days = tuple(
+            DailyReport(
+                date=f"2026-07-{day:02d}",
+                observations=(
+                    Observation(
+                        datetime.fromisoformat(f"2026-07-{day:02d}T09:00:00+02:00"),
+                        ObservationType.FIRST_ACTIVITY,
+                    ),
+                ),
+                work_blocks=(
+                    TimeBlock(
+                        "work",
+                        datetime.fromisoformat(f"2026-07-{day:02d}T09:00:00+02:00"),
+                        datetime.fromisoformat(f"2026-07-{day:02d}T17:00:00+02:00"),
+                    ),
+                ),
+                break_blocks=(),
+                anomalies=(),
+            )
+            for day in range(6, 11)
+        )
+        report = WeeklyReport("2026-07-06", days)
+        disabled_text = TextBuffer()
+        enabled_text = TextBuffer()
+
+        _render_weekly(disabled_text, report)
+        _render_weekly(enabled_text, report, apply_weekly_cap=True)
+
+        self.assertIn("Travail estimé : 8 h 00", disabled_text.rendered())
+        self.assertIn(
+            f"Travail estimé : {format_duration(WEEKLY_DECLARATION_TARGET_SECONDS // 5)}",
+            enabled_text.rendered(),
+        )
+        self.assertNotIn("Déclaration proposée", enabled_text.rendered())
 
 
 if __name__ == "__main__":

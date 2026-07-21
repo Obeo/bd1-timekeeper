@@ -14,6 +14,7 @@ from enum import StrEnum
 from typing import Any
 
 from bd1.calendar import is_working_day
+from bd1.settings import DEFAULT_WEEKLY_CAP_HOURS
 
 
 class ObservationType(StrEnum):
@@ -72,7 +73,8 @@ class DailyReport:
         return sum(block.seconds for block in self.break_blocks)
 
 
-WEEKLY_DECLARATION_TARGET_SECONDS = 37 * 3600
+WEEKLY_DECLARATION_TARGET_HOURS = DEFAULT_WEEKLY_CAP_HOURS
+WEEKLY_DECLARATION_TARGET_SECONDS = WEEKLY_DECLARATION_TARGET_HOURS * 3600
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,12 +111,16 @@ class WeeklyReport:
 
     @property
     def declaration(self) -> WeeklyDeclaration:
+        return self.declaration_for(WEEKLY_DECLARATION_TARGET_HOURS)
+
+    def declaration_for(self, target_hours: int) -> WeeklyDeclaration:
+        target_seconds = target_hours * 3600
         return WeeklyDeclaration(
-            target_seconds=WEEKLY_DECLARATION_TARGET_SECONDS,
+            target_seconds=target_seconds,
             estimated_seconds=self.worked_seconds,
             proposed_days=_weekly_declaration_days(
                 self._workdays,
-                WEEKLY_DECLARATION_TARGET_SECONDS,
+                target_seconds,
             ),
         )
 

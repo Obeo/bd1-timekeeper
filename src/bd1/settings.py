@@ -18,6 +18,7 @@ from bd1.paths import settings_path
 DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME_TIME = "13:58"
 LUNCH_AUTOMATIC_WORK_RESUME_TIME_MIN = "12:00"
 LUNCH_AUTOMATIC_WORK_RESUME_TIME_MAX = "14:00"
+DEFAULT_WEEKLY_CAP_HOURS = 37
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +31,8 @@ class Settings:
     heartbeat_interval_seconds: float = 300.0
     idle_ignored_process_names: tuple[str, ...] = ("aomhost64.exe", "cpthost")
     lunch_automatic_work_resume_time: str = DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME_TIME
+    weekly_37h_cap_enabled: bool = False
+    weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS
 
     @property
     def idle_threshold_seconds(self) -> int:
@@ -65,6 +68,11 @@ def load_settings(path: Path | None = None) -> Settings:
             data["lunch_automatic_work_resume_time"],
             DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME_TIME,
         )
+    if "weekly_cap_hours" in data:
+        data["weekly_cap_hours"] = normalize_weekly_cap_hours(
+            data["weekly_cap_hours"],
+            DEFAULT_WEEKLY_CAP_HOURS,
+        )
     return Settings(**data)
 
 
@@ -92,3 +100,9 @@ def normalize_lunch_automatic_work_resume_time(value: object, default: str) -> s
 
 def parse_lunch_automatic_work_resume_time(value: object, default: str) -> time:
     return time.fromisoformat(normalize_lunch_automatic_work_resume_time(value, default))
+
+
+def normalize_weekly_cap_hours(value: object, default: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return default
+    return value

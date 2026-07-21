@@ -11,7 +11,12 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timedelta
 
-from bd1.models import DailyReport, TimeBlock, WeeklyReport
+from bd1.models import (
+    WEEKLY_DECLARATION_TARGET_SECONDS,
+    DailyReport,
+    TimeBlock,
+    WeeklyReport,
+)
 
 
 class WeeklyDeclarationTest(unittest.TestCase):
@@ -20,8 +25,10 @@ class WeeklyDeclarationTest(unittest.TestCase):
 
         declaration = report.declaration
 
-        self.assertEqual(37 * 3600, declaration.target_seconds)
-        self.assertEqual(30 * 3600, declaration.remaining_seconds)
+        self.assertEqual(WEEKLY_DECLARATION_TARGET_SECONDS, declaration.target_seconds)
+        self.assertEqual(
+            WEEKLY_DECLARATION_TARGET_SECONDS - 7 * 3600, declaration.remaining_seconds
+        )
         self.assertEqual(0, declaration.excess_seconds)
         self.assertEqual(report.days, declaration.proposed_days)
 
@@ -38,7 +45,18 @@ class WeeklyDeclarationTest(unittest.TestCase):
 
         self.assertEqual(0, declaration.remaining_seconds)
         self.assertEqual(0, declaration.excess_seconds)
-        self.assertEqual(37 * 3600, declaration.proposed_seconds)
+        self.assertEqual(WEEKLY_DECLARATION_TARGET_SECONDS, declaration.proposed_seconds)
+
+    def test_declaration_uses_configured_target(self) -> None:
+        report = WeeklyReport(
+            "2026-07-06",
+            tuple(_day(f"2026-07-{day:02d}", 8) for day in range(6, 11)),
+        )
+
+        declaration = report.declaration_for(20)
+
+        self.assertEqual(20 * 3600, declaration.target_seconds)
+        self.assertEqual(20 * 3600, declaration.proposed_seconds)
 
     def test_week_above_target_reduces_each_worked_day(self) -> None:
         report = WeeklyReport(
@@ -48,14 +66,20 @@ class WeeklyDeclarationTest(unittest.TestCase):
 
         declaration = report.declaration
 
-        self.assertEqual(3 * 3600, declaration.excess_seconds)
-        self.assertEqual(37 * 3600, declaration.proposed_seconds)
+        self.assertEqual(40 * 3600 - WEEKLY_DECLARATION_TARGET_SECONDS, declaration.excess_seconds)
+        self.assertEqual(WEEKLY_DECLARATION_TARGET_SECONDS, declaration.proposed_seconds)
         self.assertEqual(
-            [7 * 3600 + 24 * 60] * 5,
+            [WEEKLY_DECLARATION_TARGET_SECONDS // 5] * 5,
             [day.worked_seconds for day in declaration.proposed_days],
         )
         self.assertEqual(
-            ["16:24"] * 5,
+            [
+                (
+                    datetime.fromisoformat("2026-07-06T09:00:00+02:00")
+                    + timedelta(seconds=WEEKLY_DECLARATION_TARGET_SECONDS // 5)
+                ).strftime("%H:%M")
+            ]
+            * 5,
             [day.work_blocks[-1].end.strftime("%H:%M") for day in declaration.proposed_days],
         )
 
@@ -76,7 +100,7 @@ class WeeklyDeclarationTest(unittest.TestCase):
         declaration = report.declaration
 
         self.assertEqual(40 * 3600, declaration.estimated_seconds)
-        self.assertEqual(37 * 3600, declaration.proposed_seconds)
+        self.assertEqual(WEEKLY_DECLARATION_TARGET_SECONDS, declaration.proposed_seconds)
         self.assertEqual(
             ["2026-07-06", "2026-07-07", "2026-07-08", "2026-07-09", "2026-07-10"],
             [day.date for day in declaration.proposed_days],
