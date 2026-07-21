@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable
-from datetime import date
+from datetime import date, time
 
-from bd1.analyzer import WORK_START_EVENTS, ReportAnalyzer
+from bd1.analyzer import DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME, WORK_START_EVENTS, ReportAnalyzer
 from bd1.calendar import is_working_day
 from bd1.models import DailyReport, WeeklyReport
 from bd1.storage import ObservationStore
@@ -27,9 +27,15 @@ class ReportService:
         store: ObservationStore,
         analyzer: ReportAnalyzer | None = None,
         today_provider: Callable[[], date] | None = None,
+        lunch_automatic_work_resume: time | None = None,
     ) -> None:
         self.store = store
-        self.analyzer = analyzer or ReportAnalyzer()
+        if analyzer is None:
+            analyzer = ReportAnalyzer(
+                lunch_automatic_work_resume=lunch_automatic_work_resume
+                or DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME
+            )
+        self.analyzer = analyzer
         self._today_provider = today_provider or date.today
 
     def daily(self, day: date | None = None) -> DailyReport:

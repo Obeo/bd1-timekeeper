@@ -93,6 +93,27 @@ class BD1ApplicationTest(unittest.TestCase):
             any(observation.type == ObservationType.APP_HEARTBEAT for observation in observations)
         )
 
+    def test_run_exits_when_another_instance_is_running(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(
+                    Settings(),
+                    store,
+                    activity_monitor_enabled=False,
+                    single_instance_lock=FakeSingleInstanceLock(acquired=False),
+                )
+
+                app.run()
+
+                observations = store.list_for_day(datetime.now().astimezone().date())
+            finally:
+                store.close()
+
+        self.assertFalse(
+            any(observation.type == ObservationType.APP_STARTED for observation in observations)
+        )
+
     def test_passes_idle_ignored_process_names_to_activity_monitor(self) -> None:
         monitor = Mock()
         activity_module = ModuleType("bd1.activity")
@@ -114,6 +135,59 @@ class BD1ApplicationTest(unittest.TestCase):
             monitor.call_args.kwargs["idle_ignored_process_names"],
         )
 
+    def test_records_windows_session_end_once(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(
+                    Settings(),
+                    store,
+                    activity_monitor_enabled=False,
+                )
+
+                app._record_windows_session_end("query_end_session")
+                app._record_windows_session_end("end_session")
+
+                observations = store.list_for_day(datetime.now().astimezone().date())
+            finally:
+                store.close()
+
+        shutdowns = [
+            observation
+            for observation in observations
+            if observation.type == ObservationType.SHUTDOWN
+        ]
+        self.assertEqual(1, len(shutdowns))
+        self.assertEqual(
+            {"source": "windows_session", "phase": "query_end_session"},
+            shutdowns[0].metadata,
+        )
+
+    def test_starts_windows_session_listener_on_windows(self) -> None:
+        listener = Mock()
+        windows_session_module = ModuleType("bd1.windows_session")
+        windows_session_module.WindowsSessionEndListener = listener
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(
+                    Settings(),
+                    store,
+                    activity_monitor_enabled=False,
+                )
+
+                with (
+                    patch("bd1.app.sys.platform", "win32"),
+                    patch.dict("sys.modules", {"bd1.windows_session": windows_session_module}),
+                ):
+                    app._start_windows_session_listener()
+            finally:
+                store.close()
+
+        listener.assert_called_once_with(app._record_windows_session_end)
+        listener.return_value.start.assert_called_once_with()
+
 
 class FakeAutostartManager:
     def __init__(self) -> None:
@@ -128,6 +202,18 @@ class FakeAutostartManager:
 
     def refresh_if_enabled(self) -> AutostartStatus:
         return AutostartStatus(True, self.enabled, "fake")
+
+
+class FakeSingleInstanceLock:
+    def __init__(self, acquired: bool = True) -> None:
+        self.acquired = acquired
+        self.released = False
+
+    def acquire(self) -> bool:
+        return self.acquired
+
+    def release(self) -> None:
+        self.released = True
 
 
 if __name__ == "__main__":

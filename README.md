@@ -60,6 +60,8 @@ BD-1 creates a `settings.json` file in the user data directory resolved by
 %LOCALAPPDATA%\BD-1\BD-1\settings.json
 ```
 
+#### idle_ignored_process_names
+
 The `idle_ignored_process_names` setting lists process names that should prevent
 BD-1 from turning keyboard and mouse inactivity into a break. This is useful for
 meeting applications where the user may be working without touching the keyboard
@@ -70,6 +72,7 @@ and `cpthost` on Linux:
 
 ```json
 {
+  "lunch_automatic_work_resume_time": "13:58",
   "idle_ignored_process_names": [
     "aomhost64.exe",
     "cpthost"
@@ -77,17 +80,15 @@ and `cpthost` on Linux:
 }
 ```
 
-To ignore more applications, add their process names to the list:
+To ignore more applications, add their process names to the list.
 
-```json
-{
-  "idle_ignored_process_names": [
-    "aomhost64.exe",
-    "cpthost",
-    "Teams.exe"
-  ]
-}
-```
+#### lunch_automatic_work_resume_time
+
+The `lunch_automatic_work_resume_time` setting controls the time used when BD-1
+detects activity during the protected lunch window. For example, if the computer
+wakes up at 13:20 but this value is set to `13:58`, BD-1 keeps the lunch break
+open until 13:58. Use the `HH:MM` format. Missing or invalid values fall back to
+`13:58`. The value must be after `12:00` and no later than `14:00`.
 
 ## Development
 

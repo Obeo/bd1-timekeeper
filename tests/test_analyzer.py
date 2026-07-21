@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from bd1.analyzer import ReportAnalyzer
@@ -100,6 +100,27 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("12:08", report.break_blocks[0].start.strftime("%H:%M"))
         self.assertEqual("13:58", report.break_blocks[0].end.strftime("%H:%M"))
         self.assertEqual("13:58", report.work_blocks[1].start.strftime("%H:%M"))
+
+    def test_automatic_lunch_resume_uses_configured_time(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:08:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T13:20:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer(lunch_automatic_work_resume=time(13, 45)).build_daily(
+            day, observations
+        )
+
+        self.assertEqual("13:45", report.break_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("13:45", report.work_blocks[1].start.strftime("%H:%M"))
+
+    def test_automatic_lunch_resume_ignores_out_of_lunch_configured_time(self) -> None:
+        analyzer = ReportAnalyzer(lunch_automatic_work_resume=time(15, 0))
+
+        self.assertEqual(time(13, 58), analyzer.lunch_automatic_work_resume)
 
     def test_explicit_lunch_working_mark_starts_work_immediately(self) -> None:
         day = date(2026, 7, 8)

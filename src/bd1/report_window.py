@@ -122,11 +122,21 @@ def _run_report_window_process(
     initial_date: date,
     commands: Any,
 ) -> None:
+    from bd1.settings import load_settings
     from bd1.storage import ObservationStore
 
+    settings = load_settings()
     store = ObservationStore(database_path)
     try:
-        _ReportWindowUI(ReportService(store), initial_view, initial_date, commands).run()
+        _ReportWindowUI(
+            ReportService(
+                store,
+                lunch_automatic_work_resume=settings.lunch_automatic_work_resume,
+            ),
+            initial_view,
+            initial_date,
+            commands,
+        ).run()
     finally:
         store.close()
 

@@ -32,12 +32,19 @@ LATE_APP_START_AFTER_BOOT_SECONDS = 60 * 60
 SHORT_AUTOMATIC_RESUME_SECONDS = 5 * 60
 LUNCH_START = time(12, 0)
 LUNCH_END = time(14, 0)
-LUNCH_AUTOMATIC_WORK_RESUME = time(13, 58)
+DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME = time(13, 58)
 
 
 class ReportAnalyzer:
-    def __init__(self, now_provider: Callable[[], datetime] | None = None) -> None:
+    def __init__(
+        self,
+        now_provider: Callable[[], datetime] | None = None,
+        lunch_automatic_work_resume: time = DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME,
+    ) -> None:
         self._now_provider = now_provider or (lambda: datetime.now().astimezone())
+        self.lunch_automatic_work_resume = self._normalize_lunch_automatic_work_resume(
+            lunch_automatic_work_resume
+        )
 
     def build_daily(self, day: date, observations: Iterable[Observation]) -> DailyReport:
         ordered = tuple(sorted(observations, key=lambda item: (item.observed_at, item.id or 0)))
@@ -222,15 +229,19 @@ class ReportAnalyzer:
         elif label == "break":
             break_blocks.append(block)
 
-    @staticmethod
-    def _is_protected_lunch_resume(observed_at: datetime) -> bool:
-        return LUNCH_START <= observed_at.time() < LUNCH_AUTOMATIC_WORK_RESUME
+    def _is_protected_lunch_resume(self, observed_at: datetime) -> bool:
+        return LUNCH_START <= observed_at.time() < self.lunch_automatic_work_resume
 
     @staticmethod
-    def _lunch_automatic_work_resume_at(observed_at: datetime) -> datetime:
+    def _normalize_lunch_automatic_work_resume(value: time) -> time:
+        if LUNCH_START < value <= LUNCH_END:
+            return value
+        return DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME
+
+    def _lunch_automatic_work_resume_at(self, observed_at: datetime) -> datetime:
         return observed_at.replace(
-            hour=LUNCH_AUTOMATIC_WORK_RESUME.hour,
-            minute=LUNCH_AUTOMATIC_WORK_RESUME.minute,
+            hour=self.lunch_automatic_work_resume.hour,
+            minute=self.lunch_automatic_work_resume.minute,
             second=0,
             microsecond=0,
         )

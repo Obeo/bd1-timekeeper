@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import time
 from pathlib import Path
 
 from bd1.settings import Settings, load_settings, save_settings
@@ -38,6 +39,69 @@ class SettingsTest(unittest.TestCase):
             ("aomhost64.exe", "cpthost"),
             settings.idle_ignored_process_names,
         )
+
+    def test_round_trips_lunch_automatic_work_resume_time(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            settings = Settings(lunch_automatic_work_resume_time="13:45")
+
+            save_settings(settings, path)
+            loaded = load_settings(path)
+
+        self.assertEqual("13:45", loaded.lunch_automatic_work_resume_time)
+        self.assertEqual(time(13, 45), loaded.lunch_automatic_work_resume)
+
+    def test_invalid_lunch_automatic_work_resume_time_keeps_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text(
+                json.dumps({"lunch_automatic_work_resume_time": "not-a-time"}),
+                encoding="utf-8",
+            )
+
+            settings = load_settings(path)
+
+        self.assertEqual("13:58", settings.lunch_automatic_work_resume_time)
+        self.assertEqual(time(13, 58), settings.lunch_automatic_work_resume)
+
+    def test_lunch_automatic_work_resume_time_before_lunch_keeps_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text(
+                json.dumps({"lunch_automatic_work_resume_time": "11:00"}),
+                encoding="utf-8",
+            )
+
+            settings = load_settings(path)
+
+        self.assertEqual("13:58", settings.lunch_automatic_work_resume_time)
+        self.assertEqual(time(13, 58), settings.lunch_automatic_work_resume)
+
+    def test_lunch_automatic_work_resume_time_after_lunch_keeps_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text(
+                json.dumps({"lunch_automatic_work_resume_time": "15:00"}),
+                encoding="utf-8",
+            )
+
+            settings = load_settings(path)
+
+        self.assertEqual("13:58", settings.lunch_automatic_work_resume_time)
+        self.assertEqual(time(13, 58), settings.lunch_automatic_work_resume)
+
+    def test_lunch_automatic_work_resume_time_accepts_lunch_end(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text(
+                json.dumps({"lunch_automatic_work_resume_time": "14:00"}),
+                encoding="utf-8",
+            )
+
+            settings = load_settings(path)
+
+        self.assertEqual("14:00", settings.lunch_automatic_work_resume_time)
+        self.assertEqual(time(14, 0), settings.lunch_automatic_work_resume)
 
 
 if __name__ == "__main__":

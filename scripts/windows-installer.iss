@@ -10,6 +10,7 @@
 #define MyAppVersion "0.1.0"
 #define MyAppPublisher "Obeo"
 #define MyAppExeName "BD-1.exe"
+#define MyAppMutex "Local\BD1TimekeeperSingleInstance"
 
 [Setup]
 AppId={{7A80A08B-B34A-4A99-8093-88B5A2E4CA63}
@@ -30,6 +31,8 @@ SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName={#MyAppName}
+AppMutex={#MyAppMutex}
+RestartApplications=no
 
 [Files]
 Source: "..\dist\BD-1\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
