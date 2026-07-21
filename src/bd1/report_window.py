@@ -178,7 +178,7 @@ class _ReportWindowUI:
 
         root = tk.Tk()
         root.title("BD-1 - Rapports")
-        root.geometry("900x700")
+        root.geometry("900x950")
         root.minsize(680, 500)
 
         current_view = self.initial_view
