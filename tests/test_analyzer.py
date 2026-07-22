@@ -348,6 +348,27 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("21:38", report.work_blocks[5].start.strftime("%H:%M"))
         self.assertEqual("21:47", report.work_blocks[5].end.strftime("%H:%M"))
 
+    def test_reboot_closes_open_work_at_last_observation(self) -> None:
+        day = date(2026, 7, 22)
+        observations = [
+            obs("2026-07-22T08:59:00+02:00", ObservationType.BOOT),
+            obs("2026-07-22T09:00:00+02:00", ObservationType.APP_STARTED),
+            obs("2026-07-22T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-22T20:42:00+02:00", ObservationType.APP_HEARTBEAT),
+            obs("2026-07-22T20:47:00+02:00", ObservationType.BOOT),
+            obs("2026-07-22T20:48:00+02:00", ObservationType.APP_STARTED),
+            obs("2026-07-22T20:48:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-22T23:07:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-22T23:58:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual(2, len(report.work_blocks))
+        self.assertEqual("20:42", report.work_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("20:48", report.work_blocks[1].start.strftime("%H:%M"))
+        self.assertEqual("23:07", report.work_blocks[1].end.strftime("%H:%M"))
+
     def test_late_app_start_interprets_boot_as_work_start(self) -> None:
         day = date(2026, 7, 8)
         observations = [

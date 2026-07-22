@@ -59,6 +59,20 @@ class ReportAnalyzer:
         pending_lunch_work_start: datetime | None = None
 
         for index, observation in enumerate(interpreted):
+            if observation.type == ObservationType.BOOT:
+                if current_label is not None and current_start is not None and index > 0:
+                    self._append_block(
+                        current_label,
+                        current_start,
+                        interpreted[index - 1].observed_at,
+                        work_blocks,
+                        break_blocks,
+                    )
+                current_label = None
+                current_start = None
+                pending_lunch_work_start = None
+                continue
+
             if observation.type == ObservationType.APP_STOPPED:
                 if current_label is not None and current_start is not None:
                     self._append_block(
@@ -180,7 +194,15 @@ class ReportAnalyzer:
         return DailyReport(
             date=day.isoformat(),
             observations=ordered,
-            work_blocks=self._merge_close_work_blocks(work_blocks, break_blocks),
+            work_blocks=self._merge_close_work_blocks(
+                work_blocks,
+                break_blocks,
+                tuple(
+                    observation.observed_at
+                    for observation in interpreted
+                    if observation.type == ObservationType.BOOT
+                ),
+            ),
             break_blocks=tuple(break_blocks),
             anomalies=tuple(anomalies),
         )
@@ -204,8 +226,6 @@ class ReportAnalyzer:
 
     @staticmethod
     def _label_for(observation_type: ObservationType) -> str | None:
-        if observation_type == ObservationType.BOOT:
-            return "work"
         if observation_type in WORK_START_EVENTS:
             return "work"
         if observation_type in BREAK_START_EVENTS:
@@ -234,6 +254,7 @@ class ReportAnalyzer:
     def _merge_close_work_blocks(
         work_blocks: list[TimeBlock],
         break_blocks: list[TimeBlock],
+        boot_times: tuple[datetime, ...],
     ) -> tuple[TimeBlock, ...]:
         if not work_blocks:
             return ()
@@ -246,7 +267,14 @@ class ReportAnalyzer:
                 break_block.start < block.start and break_block.end > previous.end
                 for break_block in break_blocks
             )
-            if 0 <= gap_seconds < WORK_BLOCK_MERGE_GAP_SECONDS and not has_break_between:
+            has_boot_between = any(
+                previous.end <= boot_time <= block.start for boot_time in boot_times
+            )
+            if (
+                0 <= gap_seconds < WORK_BLOCK_MERGE_GAP_SECONDS
+                and not has_break_between
+                and not has_boot_between
+            ):
                 merged[-1] = TimeBlock(
                     label="work",
                     start=previous.start,
@@ -324,26 +352,14 @@ class ReportAnalyzer:
             None,
         )
         if boot is None or app_started is None:
-            return tuple(
-                observation
-                for observation in observations
-                if observation.type != ObservationType.BOOT
-            )
+            return observations
 
         if app_started.observed_at <= boot.observed_at:
-            return tuple(
-                observation
-                for observation in observations
-                if observation.type != ObservationType.BOOT
-            )
+            return observations
 
         gap_seconds = int((app_started.observed_at - boot.observed_at).total_seconds())
         if gap_seconds < LATE_APP_START_AFTER_BOOT_SECONDS:
-            return tuple(
-                observation
-                for observation in observations
-                if observation.type != ObservationType.BOOT
-            )
+            return observations
 
         has_work_signal_after_app_start = any(
             observation.type in WORK_START_EVENTS
@@ -351,17 +367,24 @@ class ReportAnalyzer:
             for observation in observations
         )
         if not has_work_signal_after_app_start:
-            return tuple(
-                observation
-                for observation in observations
-                if observation.type != ObservationType.BOOT
+            return observations
+
+        interpreted = tuple(
+            Observation(
+                observed_at=boot.observed_at,
+                type=ObservationType.USER_WORKING,
+                metadata={"source": "inferred_late_app_start"},
             )
+            if observation is boot
+            else observation
+            for observation in observations
+        )
 
         if ReportAnalyzer._should_insert_default_lunch_break(boot, app_started, observations):
             return tuple(
                 sorted(
                     (
-                        *observations,
+                        *interpreted,
                         Observation(
                             observed_at=boot.observed_at.replace(
                                 hour=LUNCH_START.hour,
@@ -386,8 +409,7 @@ class ReportAnalyzer:
                     key=lambda item: (item.observed_at, item.id or 0),
                 )
             )
-
-        return observations
+        return interpreted
 
     @staticmethod
     def _should_insert_default_lunch_break(
