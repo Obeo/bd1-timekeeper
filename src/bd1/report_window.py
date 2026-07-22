@@ -15,11 +15,21 @@ from datetime import date, datetime, timedelta
 from enum import StrEnum
 from multiprocessing import get_context
 from pathlib import Path
-from queue import Empty
+from queue import Empty, SimpleQueue
 from threading import Thread
 from typing import Any, Literal
 
 from bd1.calendar import is_working_day
+from bd1.eurecia import (
+    EureciaAuthenticationError,
+    EureciaCredentialError,
+    EureciaError,
+    EureciaHttpClient,
+    delete_password,
+    eurecia_days_from_report,
+    get_saved_password,
+    store_password,
+)
 from bd1.formatting import format_duration
 from bd1.macos_dock import DockController, create_dock_controller
 from bd1.models import (
@@ -118,10 +128,7 @@ class ReportWindow:
             return
         with suppress(BrokenPipeError, OSError):
             self._commands.put("close")
-        process.join(timeout=2)
-        if process.is_alive():
-            process.terminate()
-            process.join(timeout=1)
+        process.join()
 
     def _wait_for_process(self) -> None:
         process = self._process
@@ -176,6 +183,11 @@ class _ReportWindowUI:
         self._dock_controller = (
             dock_controller if dock_controller is not None else create_dock_controller()
         )
+        self._eurecia_client: EureciaHttpClient | None = None
+        self._eurecia_password: str | None = None
+        self._eurecia_remember_password = False
+        self._eurecia_password_was_saved = False
+        self._eurecia_saved_password_rejected = False
 
     def run(self) -> None:
         import tkinter as tk
@@ -327,6 +339,11 @@ class _ReportWindowUI:
             command=lambda: delete_current_day(),
         )
         delete_button.pack(side="right")
+        eurecia_button = tk.Button(
+            footer,
+            text="Pousser vers Eurecia",
+            command=lambda: push_to_eurecia(),
+        )
 
         def copy_report(_event: Any = None) -> str:
             try:
@@ -353,10 +370,18 @@ class _ReportWindowUI:
         text.bind("<Control-A>", select_all)
 
         window_closed = False
+        push_in_progress = False
 
         def close_window() -> None:
             nonlocal window_closed
             if window_closed:
+                return
+            if push_in_progress:
+                messagebox.showwarning(
+                    "Envoi Eurecia en cours",
+                    "Attendez la fin de la sauvegarde Eurecia avant de fermer le rapport.",
+                    parent=root,
+                )
                 return
             window_closed = True
             root.destroy()
@@ -392,6 +417,248 @@ class _ReportWindowUI:
             deleted_count = self.report_service.delete_day(current_date)
             render()
             status_message_var.set(f"{deleted_count} événement(s) supprimé(s)")
+
+        def eurecia_configuration() -> tuple[EureciaHttpClient, str] | None:
+            from tkinter import simpledialog
+
+            base_url = self.settings.eurecia_base_url
+            email = self.settings.eurecia_email
+            if not base_url:
+                base_url = simpledialog.askstring(
+                    "Configuration Eurecia",
+                    "URL de votre instance Eurecia :\n"
+                    "Format : https://<tenant>.eurecia.com/eurecia/",
+                    initialvalue="https://",
+                    parent=root,
+                )
+            if not base_url:
+                return None
+            if not email:
+                email = simpledialog.askstring(
+                    "Configuration Eurecia",
+                    "Adresse e-mail Eurecia :",
+                    parent=root,
+                )
+            if not email:
+                return None
+            password = self._eurecia_password
+            if password is None:
+                saved_password = None
+                if not self._eurecia_saved_password_rejected:
+                    try:
+                        saved_password = get_saved_password(base_url, email)
+                    except EureciaCredentialError as error:
+                        messagebox.showwarning("Authentification Eurecia", str(error), parent=root)
+                self._eurecia_password_was_saved = (
+                    saved_password is not None or self._eurecia_saved_password_rejected
+                )
+                if saved_password is not None:
+                    password = saved_password
+                    self._eurecia_remember_password = True
+                else:
+                    credentials = _ask_eurecia_password(
+                        root,
+                        remember_default=self._eurecia_saved_password_rejected,
+                    )
+                    if credentials is None:
+                        return None
+                    password, self._eurecia_remember_password = credentials
+            if not password:
+                return None
+            try:
+                if (
+                    self._eurecia_client is None
+                    or self._eurecia_client.base_url != base_url.rstrip("/") + "/"
+                ):
+                    self._eurecia_client = EureciaHttpClient(base_url)
+            except EureciaError as error:
+                messagebox.showerror("Configuration Eurecia", str(error), parent=root)
+                return None
+
+            self._eurecia_password = password
+            if base_url != self.settings.eurecia_base_url or email != self.settings.eurecia_email:
+                self.settings = replace(
+                    self.settings,
+                    eurecia_base_url=base_url,
+                    eurecia_email=email,
+                )
+                save_settings(
+                    replace(
+                        load_settings(),
+                        eurecia_base_url=base_url,
+                        eurecia_email=email,
+                    )
+                )
+            return self._eurecia_client, password
+
+        def push_to_eurecia() -> None:
+            nonlocal push_in_progress
+            if current_view != ReportView.WEEK or push_in_progress:
+                return
+            configured = eurecia_configuration()
+            if configured is None:
+                return
+            client, password = configured
+            report = self.report_service.weekly(current_date)
+            apply_weekly_cap = self.settings.weekly_37h_cap_enabled
+            weekly_cap_hours = self.settings.weekly_cap_hours
+            email = self.settings.eurecia_email
+            week = date.fromisoformat(report.week_start).isocalendar()
+            remember_password = self._eurecia_remember_password
+            password_was_saved = self._eurecia_password_was_saved
+            replace_saved_password = self._eurecia_saved_password_rejected
+
+            log_window = tk.Toplevel(root)
+            log_window.title(f"Envoi Eurecia — {week.year}-W{week.week:02d}")
+            log_window.geometry("720x460")
+            log_window.minsize(520, 300)
+            log_window.columnconfigure(0, weight=1)
+            log_window.rowconfigure(0, weight=1)
+            log_text = tk.Text(log_window, wrap="word", padx=12, pady=10, state="disabled")
+            log_text.grid(row=0, column=0, sticky="nsew", padx=(10, 0), pady=10)
+            log_scrollbar = tk.Scrollbar(log_window, command=log_text.yview)
+            log_scrollbar.grid(row=0, column=1, sticky="ns", padx=(0, 10), pady=10)
+            log_text.configure(yscrollcommand=log_scrollbar.set)
+            log_text.tag_configure("success", foreground="#176b45")
+            log_text.tag_configure("error", foreground="#b00020")
+
+            def copy_log(_event: Any = None) -> str:
+                try:
+                    content = log_text.get("sel.first", "sel.last")
+                except tk.TclError:
+                    content = log_text.get("1.0", "end-1c")
+                root.clipboard_clear()
+                root.clipboard_append(content)
+                root.update_idletasks()
+                return "break"
+
+            def select_all_log(_event: Any = None) -> str:
+                log_text.tag_add("sel", "1.0", "end-1c")
+                return "break"
+
+            for shortcut in ("<Control-c>", "<Control-C>", "<Command-c>"):
+                log_text.bind(shortcut, copy_log)
+            for shortcut in ("<Control-a>", "<Control-A>", "<Command-a>"):
+                log_text.bind(shortcut, select_all_log)
+            close_log_button = tk.Button(
+                log_window,
+                text="Fermer",
+                state="disabled",
+                command=log_window.destroy,
+            )
+            close_log_button.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+            log_window.protocol("WM_DELETE_WINDOW", lambda: None)
+
+            events: SimpleQueue[tuple[str, str]] = SimpleQueue()
+            push_in_progress = True
+            eurecia_button.configure(state="disabled")
+
+            def worker() -> None:
+                try:
+                    events.put(("log", "Préparation des segments affichés dans BD-1."))
+                    target_days = eurecia_days_from_report(
+                        report,
+                        apply_weekly_cap=apply_weekly_cap,
+                        weekly_cap_hours=weekly_cap_hours,
+                        vpn_interface_patterns=self.settings.vpn_interface_patterns,
+                    )
+                    segment_count = sum(len(day.segments) for day in target_days)
+                    events.put(
+                        (
+                            "log",
+                            f"{len(target_days)} journée(s), {segment_count} segment(s) à envoyer.",
+                        )
+                    )
+                    if not client.is_authenticated():
+                        events.put(("log", "Session absente ou expirée : authentification SSO."))
+                        try:
+                            client.login(email, password)
+                        except EureciaAuthenticationError:
+                            events.put(
+                                (
+                                    "authentication_failed",
+                                    "Le mot de passe enregistré a été refusé."
+                                    if password_was_saved
+                                    else "",
+                                )
+                            )
+                            raise
+                        events.put(("log", "Authentification réussie."))
+                        try:
+                            if remember_password and (
+                                not password_was_saved or replace_saved_password
+                            ):
+                                store_password(client.base_url, email, password)
+                                events.put(("password_saved", ""))
+                            elif not remember_password and password_was_saved:
+                                delete_password(client.base_url, email)
+                                events.put(("password_deleted", ""))
+                        except EureciaCredentialError as error:
+                            events.put(("warning", str(error)))
+                    else:
+                        events.put(("log", "Session Eurecia encore valide : réutilisation."))
+                    client.replace_timesheet(
+                        week.year,
+                        week.week,
+                        target_days,
+                        progress=lambda message: events.put(("log", message)),
+                    )
+                except (EureciaError, ValueError) as error:
+                    events.put(("error", str(error)))
+                except Exception as error:
+                    events.put(("error", f"Erreur inattendue : {error}"))
+                else:
+                    events.put(("success", "Envoi terminé avec succès."))
+                finally:
+                    events.put(("done", ""))
+
+            def append_log(message: str, tag: str | None = None) -> None:
+                log_text.configure(state="normal")
+                log_text.insert("end", message + "\n", (tag,) if tag else ())
+                log_text.configure(state="disabled")
+                log_text.see("end")
+
+            def poll_events() -> None:
+                nonlocal push_in_progress
+                finished = False
+                while not events.empty():
+                    kind, message = events.get()
+                    if kind == "authentication_failed":
+                        self._eurecia_password = None
+                        self._eurecia_saved_password_rejected = password_was_saved
+                        if message:
+                            append_log(message, "error")
+                    elif kind == "password_saved":
+                        self._eurecia_password_was_saved = True
+                        self._eurecia_saved_password_rejected = False
+                    elif kind == "password_deleted":
+                        self._eurecia_password_was_saved = False
+                        self._eurecia_saved_password_rejected = False
+                    elif kind == "warning":
+                        append_log(f"AVERTISSEMENT — {message}")
+                    elif kind == "error":
+                        append_log(
+                            f"ÉCHEC — {message}\n"
+                            "La saisie automatique n'a pas fonctionné, "
+                            "effectuez la saisie manuellement.",
+                            "error",
+                        )
+                    elif kind == "success":
+                        append_log(f"SUCCÈS — {message}", "success")
+                    elif kind == "done":
+                        finished = True
+                    else:
+                        append_log(message)
+                if finished:
+                    push_in_progress = False
+                    eurecia_button.configure(state="normal")
+                    close_log_button.configure(state="normal")
+                    log_window.protocol("WM_DELETE_WINDOW", log_window.destroy)
+                    return
+                root.after(100, poll_events)
+
+            Thread(target=worker, name="bd1-eurecia-push", daemon=True).start()
+            root.after(100, poll_events)
 
         def move(direction: int) -> None:
             nonlocal current_date
@@ -468,11 +735,12 @@ class _ReportWindowUI:
             )
             if current_view == ReportView.WEEK:
                 weekly_cap_button.pack(side="left", before=status_label, padx=(0, 12))
+                delete_button.pack_forget()
+                eurecia_button.pack(side="right")
             else:
                 weekly_cap_button.pack_forget()
-            delete_button.configure(
-                state="normal" if current_view == ReportView.DAY else "disabled"
-            )
+                eurecia_button.pack_forget()
+                delete_button.pack(side="right")
             status_message_var.set("")
             text.configure(state="disabled")
             text.see("1.0")
@@ -483,7 +751,8 @@ class _ReportWindowUI:
                     command: ReportCommand = self._commands.get_nowait()
                     if command == "close":
                         close_window()
-                        return
+                        if window_closed:
+                            return
                     if command == "focus":
                         _focus_report_window(root, self._dock_controller)
             except Empty:
@@ -508,6 +777,52 @@ def _focus_report_window(root: Any, dock_controller: DockController) -> None:
     root.deiconify()
     root.lift()
     root.focus_force()
+
+
+def _ask_eurecia_password(
+    parent: Any,
+    *,
+    remember_default: bool,
+) -> tuple[str, bool] | None:
+    import tkinter as tk
+
+    result: tuple[str, bool] | None = None
+    window = tk.Toplevel(parent)
+    window.title("Authentification Eurecia")
+    window.resizable(False, False)
+    window.transient(parent)
+
+    password = tk.StringVar()
+    remember = tk.BooleanVar(value=remember_default)
+    frame = tk.Frame(window, padx=16, pady=14)
+    frame.pack(fill="both", expand=True)
+    tk.Label(frame, text="Mot de passe Eurecia / SSO :", anchor="w").pack(fill="x")
+    entry = tk.Entry(frame, textvariable=password, show="*", width=42)
+    entry.pack(fill="x", pady=(4, 10))
+    tk.Checkbutton(
+        frame,
+        text="Mémoriser dans le trousseau système",
+        variable=remember,
+    ).pack(anchor="w")
+    buttons = tk.Frame(frame)
+    buttons.pack(anchor="e", pady=(14, 0))
+
+    def submit() -> None:
+        nonlocal result
+        value = password.get()
+        if value:
+            result = value, remember.get()
+            window.destroy()
+
+    tk.Button(buttons, text="Annuler", command=window.destroy).pack(side="left", padx=(0, 8))
+    tk.Button(buttons, text="Continuer", command=submit, default="active").pack(side="left")
+    window.bind("<Return>", lambda _event: submit())
+    window.bind("<Escape>", lambda _event: window.destroy())
+    window.protocol("WM_DELETE_WINDOW", window.destroy)
+    entry.focus_set()
+    window.grab_set()
+    parent.wait_window(window)
+    return result
 
 
 def _normalize_date(view: ReportView, target_date: date) -> date:
@@ -585,9 +900,7 @@ def _render_weekly(
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS,
 ) -> None:
     _clear(text)
-    declaration = report.declaration_for(weekly_cap_hours) if apply_weekly_cap else None
-    report_days = declaration.proposed_days if declaration is not None else report.days
-    days = tuple(day for day in report_days if is_working_day(date.fromisoformat(day.date)))
+    days = _displayed_week_days(report, apply_weekly_cap, weekly_cap_hours)
     for index, day in enumerate(days):
         day_date = date.fromisoformat(day.date)
         tag = f"day-heading-{day.date}"
@@ -607,6 +920,17 @@ def _render_weekly(
                 _insert_line(text, "Aucune plage interprétée.", "muted")
         if index < len(days) - 1:
             _insert_line(text, "", "muted")
+
+
+def _displayed_week_days(
+    report: WeeklyReport,
+    apply_weekly_cap: bool,
+    weekly_cap_hours: int,
+) -> tuple[DailyReport, ...]:
+    report_days = (
+        report.declaration_for(weekly_cap_hours).proposed_days if apply_weekly_cap else report.days
+    )
+    return tuple(day for day in report_days if is_working_day(date.fromisoformat(day.date)))
 
 
 def _sorted_blocks(report: DailyReport) -> tuple[TimeBlock, ...]:

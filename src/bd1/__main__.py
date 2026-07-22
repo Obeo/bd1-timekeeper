@@ -19,10 +19,16 @@ from getpass import getpass
 from importlib.util import find_spec
 from multiprocessing import freeze_support
 
+from bd1.eurecia import (
+    EureciaError,
+    EureciaHttpClient,
+    eurecia_days_from_report,
+    login_interactively,
+)
 from bd1.formatting import format_daily_report, format_weekly_report
-from bd1.models import ObservationType
+from bd1.models import ObservationType, WeeklyReport
 from bd1.reports import ReportService
-from bd1.settings import load_settings, save_settings
+from bd1.settings import Settings, load_settings, save_settings
 from bd1.storage import ObservationStore
 
 
@@ -31,6 +37,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="BD-1 desktop companion")
     parser.add_argument("--report", choices=("today", "week"), help="Print a report and exit.")
     parser.add_argument("--date", help="Report date in YYYY-MM-DD format. Defaults to today.")
+    parser.add_argument(
+        "--push-eurecia",
+        type=int,
+        metavar="WEEK",
+        help="Preview and push an ISO week to Eurecia.",
+    )
+    parser.add_argument(
+        "--year",
+        type=int,
+        help="ISO year for --push-eurecia. Defaults to the current ISO year.",
+    )
+    parser.add_argument(
+        "--remember-eurecia-password",
+        action="store_true",
+        help="Store a successfully authenticated Eurecia password.",
+    )
     parser.add_argument(
         "--mark-working", action="store_true", help="Add a manual working observation."
     )
@@ -68,6 +90,8 @@ def main() -> None:
         help="Disable automatic Mattermost custom status.",
     )
     args = parser.parse_args()
+    if args.remember_eurecia_password and args.push_eurecia is None:
+        parser.error("--remember-eurecia-password requires --push-eurecia")
 
     if args.diagnose_desktop:
         print(_desktop_diagnostics())
@@ -94,6 +118,32 @@ def main() -> None:
             return
         if args.mark_break:
             store.add(ObservationType.USER_BREAK, metadata={"source": "cli"})
+            return
+        if args.push_eurecia is not None:
+            settings = load_settings()
+            iso_year = args.year or date.today().isocalendar().year
+            try:
+                target_date = date.fromisocalendar(iso_year, args.push_eurecia, 1)
+            except ValueError as error:
+                parser.error(str(error))
+            reports = ReportService(
+                store,
+                lunch_automatic_work_resume=settings.lunch_automatic_work_resume,
+            )
+            report = reports.weekly(target_date)
+            try:
+                _push_week_to_eurecia(
+                    report,
+                    settings,
+                    remember_password=args.remember_eurecia_password,
+                )
+            except EureciaError as error:
+                parser.exit(
+                    2,
+                    f"ÉCHEC — {error}\n"
+                    "La saisie automatique n'a pas fonctionné, "
+                    "effectuez la saisie manuellement.\n",
+                )
             return
         if args.report:
             settings = load_settings()
@@ -156,6 +206,59 @@ def _parse_date(value: str | None) -> date:
     if value is None:
         return date.today()
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def _push_week_to_eurecia(
+    report: WeeklyReport,
+    settings: Settings,
+    *,
+    remember_password: bool = False,
+) -> None:
+    print(
+        format_weekly_report(
+            report,
+            apply_weekly_cap=settings.weekly_37h_cap_enabled,
+            weekly_cap_hours=settings.weekly_cap_hours,
+        )
+    )
+    if input("\nConfirmer l'envoi vers Eurecia ? [o/N] ").strip().casefold() not in {
+        "o",
+        "oui",
+        "y",
+        "yes",
+    }:
+        print("Envoi annulé.")
+        return
+
+    base_url = (
+        settings.eurecia_base_url
+        or os.environ.get("BD1_EURECIA_BASE_URL", "")
+        or input("URL Eurecia (format https://<tenant>.eurecia.com/eurecia/) : ").strip()
+    )
+    email = (
+        settings.eurecia_email
+        or os.environ.get("BD1_EURECIA_EMAIL", "")
+        or input("Adresse e-mail Eurecia : ").strip()
+    )
+    if not base_url or not email:
+        raise EureciaError("L'URL et l'adresse e-mail Eurecia sont obligatoires")
+    if base_url != settings.eurecia_base_url or email != settings.eurecia_email:
+        save_settings(replace(settings, eurecia_base_url=base_url, eurecia_email=email))
+
+    client = EureciaHttpClient(base_url)
+    print("Authentification Eurecia.")
+    login_interactively(client, email, remember_password=remember_password)
+    print("Authentification réussie.")
+
+    target_days = eurecia_days_from_report(
+        report,
+        apply_weekly_cap=settings.weekly_37h_cap_enabled,
+        weekly_cap_hours=settings.weekly_cap_hours,
+        vpn_interface_patterns=settings.vpn_interface_patterns,
+    )
+    week = date.fromisoformat(report.week_start).isocalendar()
+    client.replace_timesheet(week.year, week.week, target_days, progress=print)
+    print("SUCCÈS — Envoi terminé avec succès.")
 
 
 def _desktop_diagnostics() -> str:
