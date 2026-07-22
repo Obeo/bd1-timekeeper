@@ -294,6 +294,40 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("13:58", report.work_blocks[1].start.strftime("%H:%M"))
         self.assertEqual("18:05", report.work_blocks[1].end.strftime("%H:%M"))
 
+    def test_large_heartbeat_gap_closes_current_work_block(self) -> None:
+        day = date(2026, 7, 22)
+        observations = [
+            obs("2026-07-22T00:00:01+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-22T00:14:41+02:00", ObservationType.APP_HEARTBEAT),
+            obs("2026-07-22T09:28:22+02:00", ObservationType.APP_HEARTBEAT),
+            obs("2026-07-22T09:35:38+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-22T11:02:22+02:00", ObservationType.ACTIVITY_RESUMED),
+        ]
+
+        report = ReportAnalyzer(
+            now_provider=lambda: datetime.fromisoformat("2026-07-22T11:30:00+02:00")
+        ).build_daily(day, observations)
+
+        self.assertEqual("00:14", report.work_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("11:02", report.work_blocks[1].start.strftime("%H:%M"))
+
+    def test_idle_started_uses_threshold_crossing_time_when_available(self) -> None:
+        day = date(2026, 7, 22)
+        observations = [
+            obs("2026-07-22T11:02:22+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs(
+                "2026-07-22T12:31:31+02:00",
+                ObservationType.IDLE_STARTED,
+                {"threshold_crossed_at": "2026-07-22T12:47:31+02:00"},
+            ),
+        ]
+
+        report = ReportAnalyzer(
+            now_provider=lambda: datetime.fromisoformat("2026-07-22T13:00:00+02:00")
+        ).build_daily(day, observations)
+
+        self.assertEqual("12:47", report.work_blocks[0].end.strftime("%H:%M"))
+
     def test_app_stopped_closes_a_session_before_a_later_session(self) -> None:
         day = date(2026, 7, 8)
         observations = [

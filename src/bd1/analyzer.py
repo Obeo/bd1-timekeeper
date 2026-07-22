@@ -31,6 +31,7 @@ DAY_END_EVENTS = {ObservationType.SHUTDOWN}
 LATE_APP_START_AFTER_BOOT_SECONDS = 60 * 60
 SHORT_AUTOMATIC_RESUME_SECONDS = 5 * 60
 WORK_BLOCK_MERGE_GAP_SECONDS = 2 * 60
+HEARTBEAT_GAP_OFFLINE_SECONDS = 20 * 60
 LUNCH_START = time(12, 0)
 LUNCH_END = time(14, 0)
 DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME = time(13, 58)
@@ -50,7 +51,9 @@ class ReportAnalyzer:
     def build_daily(self, day: date, observations: Iterable[Observation]) -> DailyReport:
         ordered = tuple(sorted(observations, key=lambda item: (item.observed_at, item.id or 0)))
         interpreted = self._with_boot_as_work_start_when_app_started_late(
-            self._with_idle_start_at_threshold(ordered)
+            self._with_idle_start_at_threshold(
+                self._with_offline_markers_for_heartbeat_gaps(ordered)
+            )
         )
         work_blocks: list[TimeBlock] = []
         break_blocks: list[TimeBlock] = []
@@ -390,6 +393,31 @@ class ReportAnalyzer:
             )
 
         return observations
+
+    @staticmethod
+    def _with_offline_markers_for_heartbeat_gaps(
+        observations: tuple[Observation, ...],
+    ) -> tuple[Observation, ...]:
+        adjusted: list[Observation] = []
+        previous: Observation | None = None
+        for observation in observations:
+            if previous is not None and previous.type == ObservationType.APP_HEARTBEAT:
+                gap_seconds = int((observation.observed_at - previous.observed_at).total_seconds())
+                if gap_seconds > HEARTBEAT_GAP_OFFLINE_SECONDS:
+                    adjusted.append(
+                        Observation(
+                            observed_at=previous.observed_at,
+                            type=ObservationType.APP_STOPPED,
+                            metadata={
+                                "source": "inferred_heartbeat_gap",
+                                "gap_seconds": gap_seconds,
+                            },
+                        )
+                    )
+            adjusted.append(observation)
+            previous = observation
+
+        return tuple(sorted(adjusted, key=lambda item: (item.observed_at, item.id or 0)))
 
     @staticmethod
     def _with_idle_start_at_threshold(

@@ -11,8 +11,11 @@ from __future__ import annotations
 import importlib
 import sys
 import unittest
+from queue import Empty
 from types import ModuleType
 from unittest.mock import patch
+
+from bd1.models import ObservationType
 
 
 def _activity_monitor_type() -> type:
@@ -32,6 +35,26 @@ def _activity_monitor_type() -> type:
 
 
 class ActivityMonitorMeetingTest(unittest.TestCase):
+    def test_desktop_idle_provider_records_activity_and_idle(self) -> None:
+        ActivityMonitor = _activity_monitor_type()
+        idle_values = iter((0.0, 90.0))
+        monitor = ActivityMonitor(
+            idle_threshold_seconds=60,
+            callback=lambda observation_type, observed_at, metadata: None,
+            idle_seconds_provider=lambda: next(idle_values),
+        )
+
+        monitor._watch_desktop_idle()
+        monitor._watch_desktop_idle()
+        events = (monitor._events.get_nowait(), monitor._events.get_nowait())
+
+        self.assertEqual(ObservationType.FIRST_ACTIVITY, events[0].observation_type)
+        self.assertEqual(ObservationType.IDLE_STARTED, events[1].observation_type)
+        self.assertEqual(90, events[1].metadata["observed_idle_seconds"])
+        self.assertIn("threshold_crossed_at", events[1].metadata)
+        with self.assertRaises(Empty):
+            monitor._events.get_nowait()
+
     def test_meeting_microphone_activity_is_detected_when_enabled(self) -> None:
         ActivityMonitor = _activity_monitor_type()
         monitor = ActivityMonitor.__new__(ActivityMonitor)
