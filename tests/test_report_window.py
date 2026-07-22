@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import unittest
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
 from bd1.formatting import format_duration
@@ -22,11 +23,13 @@ from bd1.models import (
 )
 from bd1.report_window import (
     ReportView,
+    _focus_report_window,
     _is_latest,
     _move_workday,
     _normalize_date,
     _render_daily,
     _render_weekly,
+    _run_mainloop_with_dock,
     _scope_title,
     format_correction,
     format_correction_explanation,
@@ -54,6 +57,24 @@ class TextBuffer:
 
 
 class ReportWindowHelpersTest(unittest.TestCase):
+    def test_dock_is_visible_while_report_mainloop_runs(self) -> None:
+        events: list[str] = []
+        root = FakeRoot(events)
+        dock = FakeDockController(events)
+
+        _run_mainloop_with_dock(root, dock)
+
+        self.assertEqual(["show", "mainloop", "hide"], events)
+
+    def test_focusing_report_reactivates_dock_application(self) -> None:
+        events: list[str] = []
+        root = FakeRoot(events)
+        dock = FakeDockController(events)
+
+        _focus_report_window(root, dock)
+
+        self.assertEqual(["show", "deiconify", "lift", "focus"], events)
+
     def test_week_view_normalizes_to_monday(self) -> None:
         self.assertEqual(
             date(2026, 7, 6),
@@ -186,6 +207,37 @@ class ReportWindowHelpersTest(unittest.TestCase):
             enabled_text.rendered(),
         )
         self.assertNotIn("Déclaration proposée", enabled_text.rendered())
+
+
+class FakeRoot:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def after_idle(self, callback: Callable[[], None]) -> None:
+        callback()
+
+    def mainloop(self) -> None:
+        self.events.append("mainloop")
+
+    def deiconify(self) -> None:
+        self.events.append("deiconify")
+
+    def lift(self) -> None:
+        self.events.append("lift")
+
+    def focus_force(self) -> None:
+        self.events.append("focus")
+
+
+class FakeDockController:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def show(self) -> None:
+        self.events.append("show")
+
+    def hide(self) -> None:
+        self.events.append("hide")
 
 
 if __name__ == "__main__":
