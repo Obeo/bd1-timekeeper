@@ -73,6 +73,7 @@ jobs:
           python -m unittest discover -s tests -v
 
       - name: Build with PyInstaller
+        if: runner.os != 'macOS'
         shell: bash
         env:
           PYSTRAY_BACKEND: dummy
@@ -87,15 +88,30 @@ jobs:
             ${{ matrix.pyinstaller_hidden_imports }} \
             scripts/bd1_entry.py
 
+      - name: Build macOS application with PyInstaller
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          PYSTRAY_BACKEND: dummy
+        run: python -m PyInstaller --noconfirm --clean scripts/bd1_macos.spec
+
       - name: Include OSS notices in application bundle
         if: runner.os == 'Linux' || runner.os == 'Windows'
         shell: bash
         run: cp LICENSE NOTICE THIRD_PARTY_LICENSES.md dist/BD-1/
 
-      - name: Include OSS notices in macOS application
+      - name: Verify macOS application metadata
         if: runner.os == 'macOS'
         shell: bash
-        run: cp LICENSE NOTICE THIRD_PARTY_LICENSES.md dist/BD-1.app/Contents/Resources/
+        run: |
+          test "$(plutil -extract LSUIElement raw dist/BD-1.app/Contents/Info.plist)" = "true"
+          test "$(plutil -extract CFBundleIdentifier raw dist/BD-1.app/Contents/Info.plist)" = "com.bd1.app"
+          icon_file="$(plutil -extract CFBundleIconFile raw dist/BD-1.app/Contents/Info.plist)"
+          test -f "dist/BD-1.app/Contents/Resources/${icon_file}"
+          test -f dist/BD-1.app/Contents/Resources/LICENSE
+          test -f dist/BD-1.app/Contents/Resources/NOTICE
+          test -f dist/BD-1.app/Contents/Resources/THIRD_PARTY_LICENSES.md
+          codesign --verify --deep --strict dist/BD-1.app
 
       - name: Package Linux bundle
         if: runner.os == 'Linux'

@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 from bd1.calendar import is_working_day
 from bd1.formatting import format_duration
+from bd1.macos_dock import DockController, create_dock_controller
 from bd1.models import (
     DailyReport,
     Observation,
@@ -165,12 +166,16 @@ class _ReportWindowUI:
         initial_view: ReportView,
         initial_date: date,
         commands: Any,
+        dock_controller: DockController | None = None,
     ) -> None:
         self.report_service = report_service
         self.settings = settings
         self.initial_view = initial_view
         self.initial_date = initial_date
         self._commands = commands
+        self._dock_controller = (
+            dock_controller if dock_controller is not None else create_dock_controller()
+        )
 
     def run(self) -> None:
         import tkinter as tk
@@ -480,16 +485,29 @@ class _ReportWindowUI:
                         close_window()
                         return
                     if command == "focus":
-                        root.deiconify()
-                        root.lift()
-                        root.focus_force()
+                        _focus_report_window(root, self._dock_controller)
             except Empty:
                 pass
             root.after(100, process_commands)
 
         render()
         root.after(100, process_commands)
+        _run_mainloop_with_dock(root, self._dock_controller)
+
+
+def _run_mainloop_with_dock(root: Any, dock_controller: DockController) -> None:
+    root.after_idle(dock_controller.show)
+    try:
         root.mainloop()
+    finally:
+        dock_controller.hide()
+
+
+def _focus_report_window(root: Any, dock_controller: DockController) -> None:
+    dock_controller.show()
+    root.deiconify()
+    root.lift()
+    root.focus_force()
 
 
 def _normalize_date(view: ReportView, target_date: date) -> date:
