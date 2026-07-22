@@ -163,6 +163,8 @@ Useful commands:
 ```bash
 bd1 --report today
 bd1 --report week
+bd1 --push-eurecia 29
+bd1 --push-eurecia 29 --remember-eurecia-password
 bd1 --mark-working
 bd1 --mark-break
 bd1 --diagnose-desktop
@@ -176,8 +178,109 @@ bd1 --disable-mattermost
 python -m unittest discover -s tests
 ```
 
+`bd1 --push-eurecia 29` first prints the report for ISO week 29 of the current
+ISO year. It requires explicit confirmation before requesting any missing
+Eurecia credentials and printing each update step. To select another ISO year:
+
+```bash
+bd1 --push-eurecia 29 --year 2026
+```
+
+### Experimental Eurecia adapter
+
+`bd1-eurecia` is a lightweight prototype for the private Eurecia web interface. It uses
+Python's HTTP and cookie support directly: it does not embed Playwright or add a runtime
+dependency. The password is prompted without echo.
+
+Configure the tenant and account, then inspect week 23 of 2026:
+
+```bash
+export BD1_EURECIA_BASE_URL='https://<tenant>.eurecia.com/eurecia/'
+export BD1_EURECIA_EMAIL='<account-email>'
+
+bd1-eurecia list
+bd1-eurecia --remember-password list
+bd1-eurecia show --year 2026 --week 23
+bd1-eurecia set-standard-week --year 2026 --week 23
+```
+
+The base URL must include the application path, for example
+`https://<tenant>.eurecia.com/eurecia/`. Global options such as `--base-url`,
+`--email`, and `--browser-session` must appear before the subcommand.
+
+The client follows Eurecia's Keycloak SSO automatically when it exposes a single password
+form. If the account requires MFA or another interactive identity-provider screen, import an
+already authenticated browser session instead:
+
+1. Open Eurecia normally in the browser and complete SSO.
+2. In the browser developer tools, open **Network** and reload Eurecia.
+3. Select the `api/v3/users/me/initData` request.
+4. In **Request headers**, copy only the complete value of the `Cookie` header.
+5. Run `bd1-eurecia --browser-session list`, paste the value into the hidden prompt, and
+   press Enter.
+
+The same option works with `show` and `set-standard-week`:
+
+```bash
+bd1-eurecia --browser-session show --year 2026 --week 23
+bd1-eurecia --browser-session set-standard-week --year 2026 --week 23
+bd1-eurecia --browser-session set-standard-week --year 2026 --week 23 --apply
+```
+
+Never paste that cookie into chat, source code, a shell command, or a committed file. The
+adapter stores imported cookies only in memory and validates them immediately with
+`initData`.
+
+Without `--apply`, `set-standard-week` is a preview. If its current and target values are
+correct, the explicit write command sets Monday through Friday to `09:00-12:00` and
+`14:00-18:00`, saves through the observed `validate=2` and `btnApply=clicked` legacy form
+contract, reloads the timesheet, and verifies every segment:
+
+```bash
+bd1-eurecia set-standard-week --year 2026 --week 23 --apply
+```
+
+Eurecia may reuse the `btnApply` HTML identifier for multiple workflow buttons. The adapter
+uses an unambiguous `Enregistrer` control when available and otherwise relies on the unique
+`validate` field; it never triggers submission or transfer buttons. It intentionally refuses
+ambiguous forms, non-`POST` saves, timesheets whose status cannot be established as
+`Nouvelle`, and rows that cannot be mapped safely. It supports the observed Eurecia Keycloak
+password flow and importing an established browser session, but it does not automate MFA or
+additional identity-provider screens. This is an unsupported private interface whose HTML
+may change; see
+[EURECIA_TIMESHEET_API.md](EURECIA_TIMESHEET_API.md) for the observed contract and current
+limitations.
+
+In the weekly report, **Pousser vers Eurecia** replaces editable rows on the displayed
+working days with the displayed BD-1 work segments. The 37-hour cap is therefore applied
+when it is enabled. Synchronized, locked rows such as paid leave and public holidays are
+preserved; work for the same day is added on separate editable rows. BD-1 adds or removes
+editable rows as needed, saves without submitting, then reloads the timesheet and verifies
+the result.
+
+The journal window reports every step, remains open on errors, and supports selecting and
+copying its text. Its final success line is green; failures and the manual-entry instruction
+are red. A verification error happens after the save request and does not imply a rollback:
+the timesheet may already have been changed.
+
+The first push requests the tenant URL, account email, and password. Later pushes request
+only information that is not already available. The URL and email are saved in
+`settings.json`. The password stays in memory unless the user selects
+**Mémoriser dans le trousseau système** or passes `--remember-eurecia-password`
+(`--remember-password` for `bd1-eurecia`). It is then stored in Windows Credential
+Manager, macOS Keychain, or the Linux Secret Service, separately for each tenant and
+email address. An expired session is authenticated again automatically. A rejected saved
+password is requested again and replaced only after successful authentication.
+
+When a working day contains a raw startup network observation classified as remote,
+BD-1 adds `Télétravail/Remote` to the first exported Eurecia segment. Existing comments
+are preserved, repeated exports do not duplicate the marker, and an office export removes
+only that marker. Days recorded before network observations were introduced remain
+unchanged because their location is unknown.
+
 The SQLite database and `settings.json` live in the user data directory resolved by
-`platformdirs`.
+`platformdirs`. On macOS, the configuration file is
+`~/Library/Application Support/BD-1/settings.json`.
 
 ## License
 

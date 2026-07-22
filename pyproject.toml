@@ -54,6 +54,7 @@ build = [
 
 [project.scripts]
 bd1 = "bd1.__main__:main"
+bd1-eurecia = "bd1.eurecia:main"
 
 [project.urls]
 Homepage = "https://github.com/Obeo/bd1-timekeeper"

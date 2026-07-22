@@ -44,6 +44,8 @@ class Settings:
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS
     mattermost_url: str = ""
     vpn_interface_patterns: tuple[str, ...] = DEFAULT_VPN_INTERFACE_PATTERNS
+    eurecia_base_url: str = ""
+    eurecia_email: str = ""
 
     @property
     def idle_threshold_seconds(self) -> int:

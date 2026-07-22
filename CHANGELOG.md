@@ -13,4 +13,7 @@ All notable changes to BD-1 are documented in this file.
 
 - Set an opt-in Mattermost custom status from the detected office or remote network.
 - Add a tray window for Mattermost URL, personal access token, and VPN settings.
+- Add opt-in system credential storage for Eurecia passwords.
+- Support Eurecia editable forms that omit Standard row markers.
+- Mark remotely worked Eurecia days with a managed `Télétravail/Remote` comment.
 - Prepare the project for distribution as open source under the EPL-2.0.
