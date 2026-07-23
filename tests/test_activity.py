@@ -73,6 +73,23 @@ class ActivityMonitorMeetingTest(unittest.TestCase):
 
         self.assertFalse(monitor._has_meeting_microphone_activity())
 
+    def test_desktop_idle_provider_does_not_mark_idle_during_meeting_activity(self) -> None:
+        ActivityMonitor = _activity_monitor_type()
+        monitor = ActivityMonitor(
+            idle_threshold_seconds=60,
+            callback=lambda observation_type, observed_at, metadata: None,
+            idle_seconds_provider=lambda: 90.0,
+            meeting_activity_detection_enabled=True,
+            meeting_process_names=("zoom",),
+            microphone_activity_checker=lambda names: names == ("zoom",),
+        )
+        monitor._seen_activity = True
+
+        monitor._watch_desktop_idle()
+
+        with self.assertRaises(Empty):
+            monitor._events.get_nowait()
+
 
 if __name__ == "__main__":
     unittest.main()

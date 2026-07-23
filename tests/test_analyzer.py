@@ -86,7 +86,7 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("09:00", report.work_blocks[0].start.strftime("%H:%M"))
         self.assertEqual("12:00", report.work_blocks[0].end.strftime("%H:%M"))
 
-    def test_automatic_idle_break_starts_when_threshold_is_crossed(self) -> None:
+    def test_automatic_idle_break_starts_at_last_activity(self) -> None:
         day = date(2026, 7, 8)
         observations = [
             obs("2026-07-08T10:01:23+02:00", ObservationType.ACTIVITY_RESUMED),
@@ -102,8 +102,8 @@ class ReportAnalyzerTest(unittest.TestCase):
         report = ReportAnalyzer().build_daily(day, observations)
 
         self.assertEqual("10:01", report.work_blocks[0].start.strftime("%H:%M"))
-        self.assertEqual("10:17", report.work_blocks[0].end.strftime("%H:%M"))
-        self.assertEqual("10:17", report.break_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("10:01", report.work_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("10:01", report.break_blocks[0].start.strftime("%H:%M"))
         self.assertEqual("10:22", report.break_blocks[0].end.strftime("%H:%M"))
 
     def test_automatic_lunch_resume_before_1358_keeps_break_until_1358(self) -> None:
@@ -169,6 +169,20 @@ class ReportAnalyzerTest(unittest.TestCase):
 
         self.assertEqual("13:58", report.break_blocks[0].end.strftime("%H:%M"))
         self.assertEqual("13:58", report.work_blocks[1].start.strftime("%H:%M"))
+
+    def test_automatic_lunch_resume_near_1358_starts_work_immediately(self) -> None:
+        day = date(2026, 7, 8)
+        observations = [
+            obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:18:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-08T13:55:00+02:00", ObservationType.ACTIVITY_RESUMED),
+            obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
+        ]
+
+        report = ReportAnalyzer().build_daily(day, observations)
+
+        self.assertEqual("13:55", report.break_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("13:55", report.work_blocks[1].start.strftime("%H:%M"))
 
     def test_short_automatic_resume_keeps_break_continuous(self) -> None:
         day = date(2026, 7, 8)
@@ -311,7 +325,26 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("00:14", report.work_blocks[0].end.strftime("%H:%M"))
         self.assertEqual("11:02", report.work_blocks[1].start.strftime("%H:%M"))
 
-    def test_idle_started_uses_threshold_crossing_time_when_available(self) -> None:
+    def test_large_heartbeat_gap_does_not_close_current_break(self) -> None:
+        day = date(2026, 7, 23)
+        observations = [
+            obs("2026-07-23T09:17:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-23T12:18:00+02:00", ObservationType.IDLE_STARTED),
+            obs("2026-07-23T12:57:00+02:00", ObservationType.APP_HEARTBEAT),
+            obs("2026-07-23T13:53:00+02:00", ObservationType.APP_HEARTBEAT),
+            obs("2026-07-23T13:55:00+02:00", ObservationType.ACTIVITY_RESUMED),
+        ]
+
+        report = ReportAnalyzer(
+            now_provider=lambda: datetime.fromisoformat("2026-07-23T15:00:00+02:00")
+        ).build_daily(day, observations)
+
+        self.assertEqual("12:18", report.break_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("13:55", report.break_blocks[0].end.strftime("%H:%M"))
+
+    def test_idle_started_keeps_last_activity_time_when_threshold_crossing_is_available(
+        self,
+    ) -> None:
         day = date(2026, 7, 22)
         observations = [
             obs("2026-07-22T11:02:22+02:00", ObservationType.ACTIVITY_RESUMED),
@@ -326,7 +359,7 @@ class ReportAnalyzerTest(unittest.TestCase):
             now_provider=lambda: datetime.fromisoformat("2026-07-22T13:00:00+02:00")
         ).build_daily(day, observations)
 
-        self.assertEqual("12:47", report.work_blocks[0].end.strftime("%H:%M"))
+        self.assertEqual("12:31", report.work_blocks[0].end.strftime("%H:%M"))
 
     def test_app_stopped_closes_a_session_before_a_later_session(self) -> None:
         day = date(2026, 7, 8)

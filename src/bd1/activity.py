@@ -177,7 +177,10 @@ class ActivityMonitor:
                         self._idle = False
                         observation_type = ObservationType.ACTIVITY_RESUMED
                 elif self._seen_activity and not self._idle:
-                    if self._has_ignored_process_running():
+                    if (
+                        self._has_ignored_process_running()
+                        or self._has_meeting_microphone_activity()
+                    ):
                         return
                     self._idle = True
                     observation_type = ObservationType.IDLE_STARTED
