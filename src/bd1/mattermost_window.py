@@ -26,6 +26,7 @@ from bd1.mattermost import (
     verify_token,
 )
 from bd1.settings import DEFAULT_VPN_INTERFACE_PATTERNS, Settings, load_settings, save_settings
+from bd1.window_icon import apply_window_icon
 
 MattermostWindowClosed = Callable[["MattermostWindow"], None]
 
@@ -157,6 +158,7 @@ class _MattermostWindowUI:
 
         root = tk.Tk()
         root.title("BD-1 - Intégration Mattermost")
+        apply_window_icon(root)
         root.resizable(False, False)
 
         server_var = tk.StringVar(value=self.settings.mattermost_url)
