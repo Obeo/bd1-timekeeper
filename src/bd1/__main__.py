@@ -24,6 +24,7 @@ from bd1.models import ObservationType
 from bd1.reports import ReportService
 from bd1.settings import load_settings, save_settings
 from bd1.storage import ObservationStore
+from bd1.window_icon import apply_window_icon
 
 
 def main() -> None:
@@ -307,6 +308,7 @@ def _prompt_mattermost_credentials() -> tuple[str, str]:
     from tkinter import simpledialog
 
     root = tk.Tk()
+    apply_window_icon(root)
     root.withdraw()
     try:
         server_url = simpledialog.askstring("BD-1", "Mattermost URL:", parent=root)
@@ -332,6 +334,7 @@ def _show_mattermost_result(message: str, failed: bool = False) -> None:
     from tkinter import messagebox
 
     root = tk.Tk()
+    apply_window_icon(root)
     root.withdraw()
     try:
         show = messagebox.showerror if failed else messagebox.showinfo

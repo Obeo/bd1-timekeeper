@@ -31,6 +31,7 @@ from bd1.models import (
 )
 from bd1.reports import ReportService
 from bd1.settings import DEFAULT_WEEKLY_CAP_HOURS, Settings, load_settings, save_settings
+from bd1.window_icon import apply_window_icon
 
 
 class ReportView(StrEnum):
@@ -183,6 +184,7 @@ class _ReportWindowUI:
 
         root = tk.Tk()
         root.title("BD-1 - Rapports")
+        apply_window_icon(root)
         root.geometry("900x950")
         root.minsize(680, 500)
 
