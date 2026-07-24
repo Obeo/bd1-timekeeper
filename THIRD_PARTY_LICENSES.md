@@ -16,6 +16,7 @@ Python environment and should be recorded with the release evidence.
 
 | Component | License | Upstream project | License text |
 | --- | --- | --- | --- |
+| keyring | MIT | <https://github.com/jaraco/keyring> | <https://github.com/jaraco/keyring/blob/main/LICENSE> |
 | platformdirs | MIT | <https://github.com/tox-dev/platformdirs> | <https://github.com/tox-dev/platformdirs/blob/main/LICENSE> |
 | psutil | BSD-3-Clause | <https://github.com/giampaolo/psutil> | <https://github.com/giampaolo/psutil/blob/master/LICENSE> |
 | tzdata | Apache-2.0 | <https://github.com/python/tzdata> | <https://github.com/python/tzdata/blob/main/LICENSE> |

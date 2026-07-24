@@ -12,14 +12,17 @@ import argparse
 import os
 import sys
 import sysconfig
+from contextlib import suppress
+from dataclasses import replace
 from datetime import date, datetime
+from getpass import getpass
 from importlib.util import find_spec
 from multiprocessing import freeze_support
 
 from bd1.formatting import format_daily_report, format_weekly_report
 from bd1.models import ObservationType
 from bd1.reports import ReportService
-from bd1.settings import load_settings
+from bd1.settings import load_settings, save_settings
 from bd1.storage import ObservationStore
 
 
@@ -54,6 +57,16 @@ def main() -> None:
         action="store_true",
         help="Print user autostart status and exit.",
     )
+    parser.add_argument(
+        "--configure-mattermost",
+        action="store_true",
+        help="Configure automatic Mattermost custom status.",
+    )
+    parser.add_argument(
+        "--disable-mattermost",
+        action="store_true",
+        help="Disable automatic Mattermost custom status.",
+    )
     args = parser.parse_args()
 
     if args.diagnose_desktop:
@@ -64,6 +77,14 @@ def main() -> None:
         return
     if args.enable_autostart or args.disable_autostart or args.autostart_status:
         print(_handle_autostart_command(args))
+        return
+    if args.configure_mattermost or args.disable_mattermost:
+        try:
+            result = _handle_mattermost_command(args)
+        except SystemExit as error:
+            _show_mattermost_result(str(error), failed=True)
+            raise
+        _show_mattermost_result(result)
         return
 
     store = ObservationStore()
@@ -225,6 +246,98 @@ def _handle_autostart_command(args: argparse.Namespace) -> str:
     if status.detail:
         lines.append(f"Detail: {status.detail}")
     return "\n".join(lines)
+
+
+def _handle_mattermost_command(args: argparse.Namespace) -> str:
+    from bd1.mattermost import (
+        MattermostError,
+        delete_token,
+        get_token,
+        normalize_server_url,
+        remove_bd1_status,
+        store_token,
+        verify_token,
+    )
+
+    settings = load_settings()
+    if args.configure_mattermost:
+        try:
+            server_url, token = _prompt_mattermost_credentials()
+            server_url = normalize_server_url(server_url)
+            token = token.strip()
+            if not token:
+                raise ValueError("Personal access token cannot be empty.")
+            verify_token(server_url, token)
+            store_token(server_url, token)
+        except (MattermostError, ValueError) as error:
+            raise SystemExit(f"Mattermost configuration failed: {error}") from error
+
+        previous_url = settings.mattermost_url
+        save_settings(replace(settings, mattermost_url=server_url))
+        if previous_url and previous_url != server_url:
+            with suppress(MattermostError):
+                delete_token(previous_url)
+        return "Mattermost integration enabled. Restart BD-1 to activate it."
+
+    details: list[str] = []
+    server_url = settings.mattermost_url
+    if server_url:
+        token = None
+        try:
+            token = get_token(server_url)
+            if token is not None and remove_bd1_status(server_url, token):
+                details.append("BD-1 custom status cleared.")
+        except MattermostError as error:
+            details.append(f"Warning: {error}")
+        if token is not None:
+            try:
+                delete_token(server_url)
+            except MattermostError as error:
+                details.append(f"Warning: {error}")
+    save_settings(replace(settings, mattermost_url=""))
+    details.insert(0, "Mattermost integration disabled.")
+    return " ".join(details)
+
+
+def _prompt_mattermost_credentials() -> tuple[str, str]:
+    if sys.stdin is not None:
+        return input("Mattermost URL: "), getpass("Personal access token: ")
+
+    import tkinter as tk
+    from tkinter import simpledialog
+
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        server_url = simpledialog.askstring("BD-1", "Mattermost URL:", parent=root)
+        token = simpledialog.askstring(
+            "BD-1",
+            "Personal access token:",
+            show="*",
+            parent=root,
+        )
+    finally:
+        root.destroy()
+    if server_url is None or token is None:
+        raise ValueError("Mattermost configuration cancelled.")
+    return server_url, token
+
+
+def _show_mattermost_result(message: str, failed: bool = False) -> None:
+    if sys.stdout is not None:
+        print(message, file=sys.stderr if failed else sys.stdout)
+        return
+
+    import tkinter as tk
+    from tkinter import messagebox
+
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        show = messagebox.showerror if failed else messagebox.showinfo
+        show("BD-1", message, parent=root)
+    finally:
+        root.destroy()
 
 
 if __name__ == "__main__":

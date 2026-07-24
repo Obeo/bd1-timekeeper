@@ -16,6 +16,7 @@ from enum import StrEnum
 import pystray
 from PIL import Image
 
+from bd1.mattermost_window import MattermostWindow
 from bd1.models import ObservationType, RuntimeState
 from bd1.paths import icon_dir
 from bd1.report_window import ReportView, ReportWindow
@@ -38,16 +39,20 @@ class TrayApp:
         add_observation: ObservationRecorder,
         autostart_is_enabled: Callable[[], bool],
         toggle_autostart: Callable[[], bool],
+        mattermost_settings_changed: Callable[[], None],
         stop_callback: Callable[[], None],
     ) -> None:
         self.store = store
         self.add_observation = add_observation
         self.autostart_is_enabled = autostart_is_enabled
         self.toggle_autostart = toggle_autostart
+        self.mattermost_settings_changed = mattermost_settings_changed
         self.stop_callback = stop_callback
         self.state = RuntimeState.PC_ON
         self._report_window: ReportWindow | None = None
         self._report_window_lock = threading.Lock()
+        self._mattermost_window: MattermostWindow | None = None
+        self._mattermost_window_lock = threading.Lock()
         self.icon = pystray.Icon("BD-1", self._load_image(self.state), "BD-1", self._menu())
 
     def run(self) -> None:
@@ -58,6 +63,10 @@ class TrayApp:
             report_window = self._report_window
         if report_window is not None:
             report_window.close()
+        with self._mattermost_window_lock:
+            mattermost_window = self._mattermost_window
+        if mattermost_window is not None:
+            mattermost_window.close()
         self.icon.stop()
 
     def set_state(self, state: RuntimeState) -> None:
@@ -88,6 +97,15 @@ class TrayApp:
                 ),
             ),
             pystray.MenuItem("Rapports", lambda *_: self._show_report_window(ReportView.DAY)),
+            pystray.MenuItem(
+                "Configurer",
+                pystray.Menu(
+                    pystray.MenuItem(
+                        "Intégration Mattermost",
+                        lambda *_: self._show_mattermost_window(),
+                    ),
+                ),
+            ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 "Lancer au démarrage",
@@ -119,6 +137,22 @@ class TrayApp:
         with self._report_window_lock:
             if self._report_window is report_window:
                 self._report_window = None
+
+    def _show_mattermost_window(self) -> None:
+        with self._mattermost_window_lock:
+            if self._mattermost_window is None or not self._mattermost_window.is_alive():
+                self._mattermost_window = MattermostWindow(
+                    on_closed=self._mattermost_window_closed,
+                )
+                self._mattermost_window.start()
+            else:
+                self._mattermost_window.focus()
+
+    def _mattermost_window_closed(self, mattermost_window: MattermostWindow) -> None:
+        with self._mattermost_window_lock:
+            if self._mattermost_window is mattermost_window:
+                self._mattermost_window = None
+        self.mattermost_settings_changed()
 
     @staticmethod
     def _load_image(state: RuntimeState) -> Image.Image:

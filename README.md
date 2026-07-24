@@ -98,6 +98,38 @@ The `weekly_cap_hours` setting controls the weekly target used when the
 For local testing, it can be set to a lower value such as `20`. Invalid or
 non-positive values fall back to `37`.
 
+#### Mattermost status
+
+BD-1 can set your Mattermost custom status to `In the office` or
+`Working remotely`. Open `Configurer` → `Intégration Mattermost` from the tray
+menu, then enter the HTTPS URL of your Mattermost server and your personal
+access token. You can also configure it from a terminal:
+
+```bash
+bd1 --configure-mattermost
+```
+
+The URL and VPN interface patterns are stored in `settings.json`; the token is
+stored in Windows Credential Manager, macOS Keychain, or the Linux Secret
+Service. Settings changed from the tray UI take effect immediately.
+
+BD-1 checks the network at startup and once per hour. A successful resolution of
+`intranet.obeo.fr` through a physical interface means office; a failed resolution
+or a route through OpenVPN means remote. Common `tun`, `tap`, `utun`, `ovpn`,
+OpenVPN, and Wintun interface names are recognized. Add renamed VPN interfaces to
+`vpn_interface_patterns` in `settings.json`, using case-insensitive glob patterns.
+
+An active custom status set manually in Mattermost takes precedence over BD-1.
+BD-1 statuses expire at the end of the local day and are refreshed the following
+day. To opt out:
+
+```bash
+bd1 --disable-mattermost
+```
+
+On Linux, a Secret Service provider such as GNOME Keyring must be available.
+BD-1 does not fall back to storing the token in plaintext.
+
 ## Development
 
 ```bash
@@ -139,6 +171,8 @@ bd1 --no-activity-monitor
 bd1 --enable-autostart
 bd1 --disable-autostart
 bd1 --autostart-status
+bd1 --configure-mattermost
+bd1 --disable-mattermost
 python -m unittest discover -s tests
 ```
 

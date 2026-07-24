@@ -9,17 +9,25 @@
 from __future__ import annotations
 
 import atexit
+import logging
 import signal
 import sys
 import threading
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from bd1.autostart import AutostartManager
+from bd1.mattermost import (
+    MattermostError,
+    get_token,
+    normalize_server_url,
+    sync_custom_status,
+)
 from bd1.models import ObservationType
-from bd1.settings import Settings, save_settings
+from bd1.network import network_status, work_location
+from bd1.settings import Settings, load_settings, save_settings
 from bd1.single_instance import SingleInstanceLock
 from bd1.state import StateMachine
 from bd1.storage import ObservationStore
@@ -29,6 +37,9 @@ from bd1.tray import TrayApp
 if TYPE_CHECKING:
     from bd1.activity import ActivityMonitor
     from bd1.windows_session import WindowsSessionEndListener
+
+LOGGER = logging.getLogger(__name__)
+MATTERMOST_SYNC_INTERVAL_SECONDS = 3600
 
 
 class BD1Application:
@@ -66,6 +77,10 @@ class BD1Application:
         self._windows_session_end_recorded = threading.Event()
         self._heartbeat_stop = threading.Event()
         self._heartbeat_thread: threading.Thread | None = None
+        self._mattermost_stop = threading.Event()
+        self._mattermost_thread: threading.Thread | None = None
+        self._mattermost_last_location: str | None = None
+        self._mattermost_last_date: date | None = None
 
     def run(self) -> None:
         if not self.single_instance_lock.acquire():
@@ -76,19 +91,25 @@ class BD1Application:
         signal.signal(signal.SIGINT, self._handle_signal)
 
         self._record_system_boot()
-        self.add_observation(ObservationType.APP_STARTED, metadata={"source": "app"})
+        startup_network_status = network_status()
+        self.add_observation(
+            ObservationType.APP_STARTED,
+            metadata={"source": "app", **startup_network_status},
+        )
         self.autostart_manager.refresh_if_enabled()
         self.tray = TrayApp(
             store=self.store,
             add_observation=self.add_observation,
             autostart_is_enabled=self.autostart_is_enabled,
             toggle_autostart=self.toggle_autostart,
+            mattermost_settings_changed=self.mattermost_settings_changed,
             stop_callback=self.stop,
         )
         if self.activity_monitor is not None:
             self.activity_monitor.start()
         self._start_windows_session_listener()
         self._start_heartbeat()
+        self._start_mattermost_sync(startup_network_status)
         self._start_signal_watcher()
         try:
             self.tray.run()
@@ -106,6 +127,7 @@ class BD1Application:
         if self.windows_session_listener is not None:
             self.windows_session_listener.stop()
         self._stop_heartbeat()
+        self._stop_mattermost_sync()
         self._record_app_stopped()
         if self.tray is not None:
             self.tray.stop()
@@ -136,6 +158,18 @@ class BD1Application:
         self.settings = replace(self.settings, autostart_enabled=status.enabled)
         save_settings(self.settings)
         return status.enabled
+
+    def mattermost_settings_changed(self) -> None:
+        with self._stop_lock:
+            if self._stopping:
+                return
+        self._stop_mattermost_sync()
+        self.settings = load_settings()
+        self._mattermost_stop = threading.Event()
+        self._mattermost_thread = None
+        self._mattermost_last_location = None
+        self._mattermost_last_date = None
+        self._start_mattermost_sync(network_status())
 
     def _record_app_stopped(self) -> None:
         try:
@@ -187,6 +221,55 @@ class BD1Application:
                 )
             except RuntimeError:
                 return
+
+    def _start_mattermost_sync(self, startup_network_status: dict[str, object]) -> None:
+        if not self.settings.mattermost_url:
+            return
+        stop_event = self._mattermost_stop
+        self._mattermost_thread = threading.Thread(
+            target=self._sync_mattermost_periodically,
+            args=(startup_network_status, stop_event),
+            daemon=True,
+        )
+        self._mattermost_thread.start()
+
+    def _stop_mattermost_sync(self) -> None:
+        self._mattermost_stop.set()
+        if self._mattermost_thread is not None:
+            self._mattermost_thread.join(timeout=2)
+
+    def _sync_mattermost_periodically(
+        self,
+        current_network_status: dict[str, object],
+        stop_event: threading.Event,
+    ) -> None:
+        while True:
+            self._sync_mattermost(current_network_status)
+            if stop_event.wait(MATTERMOST_SYNC_INTERVAL_SECONDS):
+                return
+            current_network_status = network_status()
+
+    def _sync_mattermost(self, current_network_status: dict[str, object]) -> None:
+        location = work_location(
+            current_network_status,
+            self.settings.vpn_interface_patterns,
+        )
+        today = datetime.now().astimezone().date()
+        if location == self._mattermost_last_location and today == self._mattermost_last_date:
+            return
+
+        try:
+            server_url = normalize_server_url(self.settings.mattermost_url)
+            token = get_token(server_url)
+            if token is None:
+                return
+            sync_custom_status(server_url, token, location)
+        except (MattermostError, ValueError) as error:
+            LOGGER.warning("Could not synchronize Mattermost custom status: %s", error)
+            return
+
+        self._mattermost_last_location = location
+        self._mattermost_last_date = today
 
     def _record_system_boot(self) -> None:
         try:

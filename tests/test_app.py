@@ -11,13 +11,14 @@ from __future__ import annotations
 import tempfile
 import time
 import unittest
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import Mock, patch
 
 from bd1.app import BD1Application
 from bd1.autostart import AutostartStatus
+from bd1.mattermost import MattermostError
 from bd1.models import ObservationType
 from bd1.settings import Settings
 from bd1.storage import ObservationStore
@@ -187,6 +188,107 @@ class BD1ApplicationTest(unittest.TestCase):
 
         listener.assert_called_once_with(app._record_windows_session_end)
         listener.return_value.start.assert_called_once_with()
+
+    def test_synchronizes_mattermost_only_after_location_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(
+                    Settings(mattermost_url="https://mattermost.example.com"),
+                    store,
+                    activity_monitor_enabled=False,
+                )
+                with (
+                    patch("bd1.app.get_token", return_value="secret"),
+                    patch("bd1.app.sync_custom_status") as sync,
+                ):
+                    app._sync_mattermost(
+                        {"intranet_resolved": True, "network_interface": "Ethernet"}
+                    )
+                    app._sync_mattermost(
+                        {"intranet_resolved": True, "network_interface": "Ethernet"}
+                    )
+                    app._sync_mattermost({"intranet_resolved": True, "network_interface": "tun0"})
+            finally:
+                store.close()
+
+        self.assertEqual(2, sync.call_count)
+        self.assertEqual("office", sync.call_args_list[0].args[2])
+        self.assertEqual("remote", sync.call_args_list[1].args[2])
+
+    def test_retries_mattermost_after_failed_synchronization(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(
+                    Settings(mattermost_url="https://mattermost.example.com"),
+                    store,
+                    activity_monitor_enabled=False,
+                )
+                with (
+                    patch("bd1.app.get_token", return_value="secret"),
+                    patch(
+                        "bd1.app.sync_custom_status",
+                        side_effect=MattermostError("offline"),
+                    ) as sync,
+                    self.assertLogs("bd1.app", level="WARNING"),
+                ):
+                    app._sync_mattermost(
+                        {"intranet_resolved": True, "network_interface": "Ethernet"}
+                    )
+                    app._sync_mattermost(
+                        {"intranet_resolved": True, "network_interface": "Ethernet"}
+                    )
+            finally:
+                store.close()
+
+        self.assertEqual(2, sync.call_count)
+
+    def test_refreshes_mattermost_status_on_a_new_day(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(
+                    Settings(mattermost_url="https://mattermost.example.com"),
+                    store,
+                    activity_monitor_enabled=False,
+                )
+                app._mattermost_last_location = "office"
+                app._mattermost_last_date = date.today() - timedelta(days=1)
+                with (
+                    patch("bd1.app.get_token", return_value="secret"),
+                    patch("bd1.app.sync_custom_status") as sync,
+                ):
+                    app._sync_mattermost(
+                        {"intranet_resolved": True, "network_interface": "Ethernet"}
+                    )
+            finally:
+                store.close()
+
+        sync.assert_called_once()
+
+    def test_applies_mattermost_settings_changed_from_the_tray(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                app = BD1Application(Settings(), store, activity_monitor_enabled=False)
+                updated = Settings(mattermost_url="https://mattermost.example.com")
+                old_stop_event = app._mattermost_stop
+                status = {"intranet_resolved": True, "network_interface": "Ethernet"}
+                with (
+                    patch("bd1.app.load_settings", return_value=updated),
+                    patch.object(app, "_stop_mattermost_sync") as stop,
+                    patch.object(app, "_start_mattermost_sync") as start,
+                    patch("bd1.app.network_status", return_value=status),
+                ):
+                    app.mattermost_settings_changed()
+            finally:
+                store.close()
+
+        stop.assert_called_once_with()
+        start.assert_called_once_with(status)
+        self.assertIs(updated, app.settings)
+        self.assertIsNot(old_stop_event, app._mattermost_stop)
 
 
 class FakeAutostartManager:

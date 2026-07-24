@@ -14,7 +14,13 @@ import unittest
 from datetime import time
 from pathlib import Path
 
-from bd1.settings import DEFAULT_WEEKLY_CAP_HOURS, Settings, load_settings, save_settings
+from bd1.settings import (
+    DEFAULT_VPN_INTERFACE_PATTERNS,
+    DEFAULT_WEEKLY_CAP_HOURS,
+    Settings,
+    load_settings,
+    save_settings,
+)
 
 
 class SettingsTest(unittest.TestCase):
@@ -94,6 +100,36 @@ class SettingsTest(unittest.TestCase):
 
         self.assertEqual("13:58", settings.lunch_automatic_work_resume_time)
         self.assertEqual(time(13, 58), settings.lunch_automatic_work_resume)
+
+    def test_round_trips_mattermost_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            save_settings(
+                Settings(
+                    mattermost_url="https://mattermost.example.com",
+                    vpn_interface_patterns=("tun*", "Corporate VPN"),
+                ),
+                path,
+            )
+
+            settings = load_settings(path)
+
+        self.assertEqual("https://mattermost.example.com", settings.mattermost_url)
+        self.assertEqual(("tun*", "Corporate VPN"), settings.vpn_interface_patterns)
+
+    def test_invalid_mattermost_settings_keep_safe_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text(
+                json.dumps({"mattermost_url": 42, "vpn_interface_patterns": 42}),
+                encoding="utf-8",
+            )
+
+            settings = load_settings(path)
+
+        self.assertEqual("", settings.mattermost_url)
+        self.assertEqual(DEFAULT_VPN_INTERFACE_PATTERNS, settings.vpn_interface_patterns)
+        self.assertEqual(DEFAULT_VPN_INTERFACE_PATTERNS, Settings().vpn_interface_patterns)
 
     def test_lunch_automatic_work_resume_time_before_lunch_keeps_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

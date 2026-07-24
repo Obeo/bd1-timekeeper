@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -15,6 +16,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from bd1.report_window import ReportView
+from bd1.storage import ObservationStore
 from bd1.tray import TrayApp
 
 
@@ -51,6 +53,30 @@ def _tray_without_platform_icon() -> TrayApp:
     tray._report_window = None
     tray._report_window_lock = threading.Lock()
     return tray
+
+
+class TrayAppTest(unittest.TestCase):
+    def test_exposes_mattermost_configuration_menu(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                tray = TrayApp(
+                    store,
+                    lambda *_: None,
+                    lambda: False,
+                    lambda: False,
+                    lambda: None,
+                    lambda: None,
+                )
+                configure = next(item for item in tray.icon.menu.items if item.text == "Configurer")
+            finally:
+                store.close()
+
+        self.assertIsNotNone(configure.submenu)
+        self.assertEqual(
+            ["Intégration Mattermost"],
+            [item.text for item in configure.submenu.items],
+        )
 
 
 if __name__ == "__main__":

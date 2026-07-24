@@ -11,4 +11,6 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+- Set an opt-in Mattermost custom status from the detected office or remote network.
+- Add a tray window for Mattermost URL, personal access token, and VPN settings.
 - Prepare the project for distribution as open source under the EPL-2.0.
