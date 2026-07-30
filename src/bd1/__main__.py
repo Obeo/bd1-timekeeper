@@ -9,7 +9,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
+import shutil
+import subprocess
 import sys
 import sysconfig
 from contextlib import suppress
@@ -188,6 +191,10 @@ def _desktop_diagnostics() -> str:
     for module in ("PIL", "pynput", "pystray", "tkinter"):
         lines.append(f"{module}: {'available' if find_spec(module) else 'missing'}")
 
+    appindicator_backend = _appindicator_backend_name()
+    lines.append(f"AppIndicator typelib: {appindicator_backend or 'missing'}")
+    lines.append(f"GNOME AppIndicator extension: {_gnome_appindicator_extension_status()}")
+
     if find_spec("pystray"):
         try:
             import pystray
@@ -199,6 +206,12 @@ def _desktop_diagnostics() -> str:
             lines.append(
                 f"pystray HAS_NOTIFICATION: {getattr(pystray.Icon, 'HAS_NOTIFICATION', None)}"
             )
+            if _is_gnome_wayland() and pystray.Icon.__module__ == "pystray._xorg":
+                lines.append(
+                    "Fedora/GNOME Wayland tray hint: install "
+                    "gnome-shell-extension-appindicator and libayatana-appindicator-gtk3, "
+                    "then enable the AppIndicator extension."
+                )
 
     return "\n".join(lines)
 
@@ -208,7 +221,7 @@ def _configure_tray_backend() -> None:
         return
 
     _add_system_site_packages()
-    if _has_appindicator_backend():
+    if _appindicator_backend_name():
         os.environ["PYSTRAY_BACKEND"] = "appindicator"
     elif os.environ.get("DISPLAY"):
         os.environ["PYSTRAY_BACKEND"] = "xorg"
@@ -221,17 +234,52 @@ def _add_system_site_packages() -> None:
             sys.path.append(path)
 
 
-def _has_appindicator_backend() -> bool:
+def _appindicator_backend_name() -> str | None:
     if find_spec("gi") is None:
-        return False
+        return None
     try:
         import gi
 
-        gi.require_version("AyatanaAppIndicator3", "0.1")
-        from gi.repository import AyatanaAppIndicator3  # noqa: F401
+        for namespace in ("AppIndicator3", "AyatanaAppIndicator3"):
+            try:
+                gi.require_version(namespace, "0.1")
+                importlib.import_module(f"gi.repository.{namespace}")
+            except (ImportError, ValueError):
+                continue
+            return namespace
     except (ImportError, ValueError):
-        return False
-    return True
+        return None
+    return None
+
+
+def _gnome_appindicator_extension_status() -> str:
+    if "gnome" not in os.environ.get("XDG_CURRENT_DESKTOP", "").lower():
+        return "not-gnome"
+    if shutil.which("gnome-extensions") is None:
+        return "unknown (gnome-extensions missing)"
+    try:
+        result = subprocess.run(
+            ["gnome-extensions", "list", "--enabled"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "unknown"
+    if result.returncode != 0:
+        return "unknown"
+    enabled = result.stdout.casefold()
+    if "appindicator" in enabled or "trayicons" in enabled:
+        return "enabled"
+    return "missing-or-disabled"
+
+
+def _is_gnome_wayland() -> bool:
+    return (
+        os.environ.get("XDG_SESSION_TYPE") == "wayland"
+        and "gnome" in os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+    )
 
 
 def _runtime_profile() -> str:

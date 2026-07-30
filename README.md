@@ -150,6 +150,23 @@ On Linux, `pynput` depends on `evdev`, which may compile locally. If that build
 fails with `Python.h: No such file or directory`, install the Python development
 headers for your distribution, then retry the desktop extra.
 
+On Fedora/GNOME Wayland, GNOME does not expose legacy tray icons by default.
+Install and enable AppIndicator support before running the tray application:
+
+```bash
+sudo dnf install gnome-shell-extension-appindicator libayatana-appindicator-gtk3
+gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
+bd1 --diagnose-desktop
+```
+
+The diagnostic should report `AppIndicator typelib: AyatanaAppIndicator3` or
+`AppIndicator3`, `GNOME AppIndicator extension: enabled`, and
+`pystray backend: pystray._appindicator`. If it still reports `pystray._xorg`,
+restart the GNOME session and run `bd1 --diagnose-desktop` again. The generic
+Linux tarball can only use AppIndicator when compatible GI bindings and the
+AppIndicator typelib are available on the target system; the editable install is
+the most reliable Fedora test path.
+
 The report windows use `tkinter`, which is packaged separately by some Linux
 distributions. On openSUSE, install it if `bd1` fails with
 `No module named 'tkinter'`:
