@@ -76,6 +76,7 @@ _FRENCH_WEEKDAYS = (
     "dimanche",
 )
 _STANDARD_SEGMENTS = (("09:00", "12:00"), ("14:00", "18:00"))
+_DAILY_MAX_SECONDS = 10 * 3600
 _EURECIA_IDP_HOST = "plateforme-idp.eurecia.com"
 _KEYRING_SERVICE = "BD-1 Eurecia"
 REMOTE_COMMENT = "Télétravail/Remote"
@@ -303,9 +304,13 @@ class _LegacyPageParser(HTMLParser):
         self._select_stack: list[_Control] = []
         self._option: tuple[dict[str, str], list[str]] | None = None
         self._control_count = 0
+        self.error_parts: list[str] = []
+        self._error_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = {name: value or "" for name, value in attrs}
+        if tag == "div" and (self._error_depth or attributes.get("id") == "messerr"):
+            self._error_depth += 1
         if tag == "table":
             table = self._table_count
             self._table_count += 1
@@ -352,6 +357,8 @@ class _LegacyPageParser(HTMLParser):
         self.handle_starttag(tag, attrs)
 
     def handle_endtag(self, tag: str) -> None:
+        if tag == "div" and self._error_depth:
+            self._error_depth -= 1
         if tag == "table" and self._table_stack:
             self._table_stack.pop()
         elif tag == "tr" and self._row_stack:
@@ -381,6 +388,8 @@ class _LegacyPageParser(HTMLParser):
             self._select_stack.pop()
 
     def handle_data(self, data: str) -> None:
+        if self._error_depth:
+            self.error_parts.append(data)
         for row_key in self._row_stack:
             self.row_text[row_key].append(data)
         for cell_key in self._cell_stack:
@@ -412,6 +421,7 @@ def eurecia_days_from_report(
     apply_weekly_cap: bool = False,
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS,
     vpn_interface_patterns: tuple[str, ...] = DEFAULT_VPN_INTERFACE_PATTERNS,
+    warning: Callable[[str], None] | None = None,
 ) -> tuple[EureciaDay, ...]:
     report_days = (
         report.declaration_for(weekly_cap_hours).proposed_days if apply_weekly_cap else report.days
@@ -425,6 +435,27 @@ def eurecia_days_from_report(
             EureciaSegment(block.start.strftime("%H:%M"), block.end.strftime("%H:%M"))
             for block in sorted(day.work_blocks, key=lambda item: item.start)
         )
+        worked_seconds = sum(segment.seconds for segment in segments)
+        if worked_seconds > _DAILY_MAX_SECONDS:
+            remaining = _DAILY_MAX_SECONDS
+            capped: list[EureciaSegment] = []
+            for segment in segments:
+                if remaining <= 0:
+                    break
+                if segment.seconds <= remaining:
+                    capped.append(segment)
+                    remaining -= segment.seconds
+                    continue
+                end = _minutes(segment.start) + remaining // 60
+                capped.append(EureciaSegment(segment.start, f"{end // 60:02d}:{end % 60:02d}"))
+                remaining = 0
+            segments = tuple(capped)
+            if warning:
+                warning(
+                    f"{day_date.isoformat()} : temps de {format_duration(worked_seconds)} "
+                    f"plafonné à {format_duration(_DAILY_MAX_SECONDS)} pour respecter "
+                    "le maximum Eurecia."
+                )
         remote = segments and any(
             observation.type == ObservationType.APP_STARTED
             and isinstance(observation.metadata, dict)
@@ -761,6 +792,9 @@ class EureciaHttpClient:
             accept="text/html,application/xhtml+xml",
             referer=response.url,
         )
+        save_error = _collapse(_parse_page(saved.text()).error_parts)
+        if save_error:
+            raise EureciaError(f"Eurecia refused to save the timesheet: {save_error}")
         emit("Relecture et vérification des segments sauvegardés.")
         verified = self._read_timesheet(summary)
         _verify_target_days(verified, target)

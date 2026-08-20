@@ -28,6 +28,7 @@ from bd1.eurecia import (
     EureciaSegment,
     EureciaTimesheet,
     EureciaTimesheetSummary,
+    _collapse,
     _days_from_controls,
     _days_from_page,
     _encode_form_payload,
@@ -558,6 +559,14 @@ class EureciaTest(unittest.TestCase):
         self.assertEqual("false", payload[_legacy_field("duplicatedItem", 1)])
         self.assertEqual("2", payload["validate"])
         self.assertEqual("clicked", payload["btnApply"])
+
+    def test_parser_extracts_the_legacy_save_error(self) -> None:
+        parser = _parse_page(
+            '<div id="messerr" class="modal error-text">'
+            '<div class="modal-content">Deux plages se chevauchent.</div></div>'
+        )
+
+        self.assertEqual("Deux plages se chevauchent.", _collapse(parser.error_parts))
 
     def test_remote_comment_is_managed_on_the_first_row_only(self) -> None:
         parser = _parse_page(_editable_week_html())

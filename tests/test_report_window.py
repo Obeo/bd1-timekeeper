@@ -261,6 +261,39 @@ class ReportWindowHelpersTest(unittest.TestCase):
         self.assertEqual("Télétravail/Remote", days[0].comment)
         self.assertEqual("", days[1].comment)
 
+    def test_eurecia_export_caps_a_day_at_ten_hours_with_a_warning(self) -> None:
+        wednesday = DailyReport(
+            "2026-08-19",
+            (),
+            (
+                TimeBlock(
+                    "work",
+                    datetime.fromisoformat("2026-08-19T07:49:00+02:00"),
+                    datetime.fromisoformat("2026-08-19T12:37:00+02:00"),
+                ),
+                TimeBlock(
+                    "work",
+                    datetime.fromisoformat("2026-08-19T14:00:00+02:00"),
+                    datetime.fromisoformat("2026-08-19T19:16:00+02:00"),
+                ),
+            ),
+            (),
+            (),
+        )
+        warnings: list[str] = []
+
+        days = eurecia_days_from_report(
+            WeeklyReport("2026-08-17", (wednesday,)),
+            warning=warnings.append,
+        )
+
+        self.assertEqual(10 * 3600, days[0].worked_seconds)
+        self.assertEqual("19:12", days[0].segments[-1].end)
+        self.assertEqual(
+            ["2026-08-19 : temps de 10 h 04 plafonné à 10 h 00 pour respecter le maximum Eurecia."],
+            warnings,
+        )
+
 
 class FakeRoot:
     def __init__(self, events: list[str]) -> None:

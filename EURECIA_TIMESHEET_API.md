@@ -24,6 +24,11 @@ lignes synchronisées non éditables, notamment les congés et jours fériés, e
 ne remplace que les lignes horaires éditables des jours ouvrés affichés par
 BD-1.
 
+Le tenant observé refuse une journée supérieure à `10:00`. BD-1 plafonne donc
+automatiquement les segments envoyés à dix heures, en conservant les premiers
+créneaux et en raccourcissant ou supprimant les derniers. Le journal signale
+explicitement chaque journée ajustée.
+
 La sauvegarde utilise le formulaire legacy complet renvoyé par `Open.do`. Les
 actions et champs spécifiques détaillés ci-dessous sont issus des pages HTML et
 des essais réels ; ils restent privés, non contractuels et susceptibles de
