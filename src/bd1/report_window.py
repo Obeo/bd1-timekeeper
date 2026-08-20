@@ -563,6 +563,7 @@ class _ReportWindowUI:
                         apply_weekly_cap=apply_weekly_cap,
                         weekly_cap_hours=weekly_cap_hours,
                         vpn_interface_patterns=self.settings.vpn_interface_patterns,
+                        warning=lambda message: events.put(("warning", message)),
                     )
                     segment_count = sum(len(day.segments) for day in target_days)
                     events.put(

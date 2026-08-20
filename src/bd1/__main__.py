@@ -256,6 +256,7 @@ def _push_week_to_eurecia(
         apply_weekly_cap=settings.weekly_37h_cap_enabled,
         weekly_cap_hours=settings.weekly_cap_hours,
         vpn_interface_patterns=settings.vpn_interface_patterns,
+        warning=lambda message: print(f"AVERTISSEMENT — {message}"),
     )
     week = date.fromisoformat(report.week_start).isocalendar()
     client.replace_timesheet(week.year, week.week, target_days, progress=print)
