@@ -18,6 +18,7 @@ from bd1.paths import settings_path
 DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME_TIME = "13:58"
 LUNCH_AUTOMATIC_WORK_RESUME_TIME_MIN = "12:00"
 LUNCH_AUTOMATIC_WORK_RESUME_TIME_MAX = "14:00"
+DEFAULT_IDLE_THRESHOLD_MINUTES = 16
 DEFAULT_WEEKLY_CAP_HOURS = 37
 DEFAULT_VPN_INTERFACE_PATTERNS = (
     "tun*",
@@ -32,7 +33,7 @@ DEFAULT_VPN_INTERFACE_PATTERNS = (
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-    idle_threshold_minutes: int = 16
+    idle_threshold_minutes: int = DEFAULT_IDLE_THRESHOLD_MINUTES
     autostart_enabled: bool = False
     notifications_enabled: bool = True
     update_checks_enabled: bool = True

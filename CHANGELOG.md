@@ -11,6 +11,8 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+- Merge short work interruptions, including computer restarts, up to the configured
+  inactivity threshold.
 - Detect Windows VPN adapters from their driver description when their connection name
   is localized or renamed.
 - Notify users when a newer stable GitHub release is available for their platform.

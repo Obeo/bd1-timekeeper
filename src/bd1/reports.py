@@ -15,6 +15,7 @@ from datetime import date, time
 from bd1.analyzer import DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME, WORK_START_EVENTS, ReportAnalyzer
 from bd1.calendar import is_working_day
 from bd1.models import DailyReport, WeeklyReport
+from bd1.settings import DEFAULT_IDLE_THRESHOLD_MINUTES
 from bd1.storage import ObservationStore
 
 DAILY_TARGET_SECONDS = int(7.4 * 60 * 60)
@@ -28,12 +29,14 @@ class ReportService:
         analyzer: ReportAnalyzer | None = None,
         today_provider: Callable[[], date] | None = None,
         lunch_automatic_work_resume: time | None = None,
+        idle_threshold_seconds: int = DEFAULT_IDLE_THRESHOLD_MINUTES * 60,
     ) -> None:
         self.store = store
         if analyzer is None:
             analyzer = ReportAnalyzer(
                 lunch_automatic_work_resume=lunch_automatic_work_resume
-                or DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME
+                or DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME,
+                idle_threshold_seconds=idle_threshold_seconds,
             )
         self.analyzer = analyzer
         self._today_provider = today_provider or date.today

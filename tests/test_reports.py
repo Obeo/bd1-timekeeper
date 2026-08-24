@@ -97,6 +97,11 @@ class ReportServiceTest(unittest.TestCase):
 
         self.assertEqual(time(13, 45), service.analyzer.lunch_automatic_work_resume)
 
+    def test_passes_idle_threshold_to_analyzer(self) -> None:
+        service = ReportService(Mock(), idle_threshold_seconds=12 * 60)
+
+        self.assertEqual(12 * 60, service.analyzer.idle_threshold_seconds)
+
     def test_deletes_day_observations(self) -> None:
         store = Mock()
         store.delete_for_day.return_value = 2

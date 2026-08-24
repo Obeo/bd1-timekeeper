@@ -130,6 +130,7 @@ def main() -> None:
             reports = ReportService(
                 store,
                 lunch_automatic_work_resume=settings.lunch_automatic_work_resume,
+                idle_threshold_seconds=settings.idle_threshold_seconds,
             )
             report = reports.weekly(target_date)
             try:
@@ -152,6 +153,7 @@ def main() -> None:
             reports = ReportService(
                 store,
                 lunch_automatic_work_resume=settings.lunch_automatic_work_resume,
+                idle_threshold_seconds=settings.idle_threshold_seconds,
             )
             if args.report == "today":
                 print(format_daily_report(reports.daily(target_date)))

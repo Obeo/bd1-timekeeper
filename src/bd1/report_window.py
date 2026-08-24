@@ -154,6 +154,7 @@ def _run_report_window_process(
             ReportService(
                 store,
                 lunch_automatic_work_resume=settings.lunch_automatic_work_resume,
+                idle_threshold_seconds=settings.idle_threshold_seconds,
             ),
             settings,
             initial_view,

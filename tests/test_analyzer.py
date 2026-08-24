@@ -289,13 +289,14 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("12:00", report.work_blocks[0].end.strftime("%H:%M"))
         self.assertEqual("17:00", report.work_blocks[1].start.strftime("%H:%M"))
 
-    def test_app_restart_within_two_minutes_merges_work_blocks(self) -> None:
+    def test_short_reboot_merges_work_blocks(self) -> None:
         day = date(2026, 7, 8)
         observations = [
             obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
             obs("2026-07-08T12:00:00+02:00", ObservationType.APP_STOPPED),
-            obs("2026-07-08T12:01:00+02:00", ObservationType.APP_STARTED),
-            obs("2026-07-08T12:01:00+02:00", ObservationType.FIRST_ACTIVITY),
+            obs("2026-07-08T12:02:00+02:00", ObservationType.BOOT),
+            obs("2026-07-08T12:03:00+02:00", ObservationType.APP_STARTED),
+            obs("2026-07-08T12:03:00+02:00", ObservationType.FIRST_ACTIVITY),
             obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
         ]
 
@@ -305,7 +306,7 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("09:00", report.work_blocks[0].start.strftime("%H:%M"))
         self.assertEqual("18:00", report.work_blocks[0].end.strftime("%H:%M"))
 
-    def test_app_restart_after_two_minutes_keeps_work_blocks_separate(self) -> None:
+    def test_restart_at_idle_threshold_keeps_work_blocks_separate(self) -> None:
         day = date(2026, 7, 8)
         observations = [
             obs("2026-07-08T09:00:00+02:00", ObservationType.FIRST_ACTIVITY),
@@ -315,7 +316,7 @@ class ReportAnalyzerTest(unittest.TestCase):
             obs("2026-07-08T18:00:00+02:00", ObservationType.SHUTDOWN),
         ]
 
-        report = ReportAnalyzer().build_daily(day, observations)
+        report = ReportAnalyzer(idle_threshold_seconds=2 * 60).build_daily(day, observations)
 
         self.assertEqual(2, len(report.work_blocks))
 
@@ -348,7 +349,7 @@ class ReportAnalyzerTest(unittest.TestCase):
         self.assertEqual("21:38", report.work_blocks[5].start.strftime("%H:%M"))
         self.assertEqual("21:47", report.work_blocks[5].end.strftime("%H:%M"))
 
-    def test_reboot_closes_open_work_at_last_observation(self) -> None:
+    def test_short_reboot_merges_after_last_heartbeat(self) -> None:
         day = date(2026, 7, 22)
         observations = [
             obs("2026-07-22T08:59:00+02:00", ObservationType.BOOT),
@@ -364,10 +365,9 @@ class ReportAnalyzerTest(unittest.TestCase):
 
         report = ReportAnalyzer().build_daily(day, observations)
 
-        self.assertEqual(2, len(report.work_blocks))
-        self.assertEqual("20:42", report.work_blocks[0].end.strftime("%H:%M"))
-        self.assertEqual("20:48", report.work_blocks[1].start.strftime("%H:%M"))
-        self.assertEqual("23:07", report.work_blocks[1].end.strftime("%H:%M"))
+        self.assertEqual(1, len(report.work_blocks))
+        self.assertEqual("09:00", report.work_blocks[0].start.strftime("%H:%M"))
+        self.assertEqual("23:07", report.work_blocks[0].end.strftime("%H:%M"))
 
     def test_late_app_start_interprets_boot_as_work_start(self) -> None:
         day = date(2026, 7, 8)
