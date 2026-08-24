@@ -18,10 +18,12 @@ recomputes suggestions on demand.
 
 ## Installation
 
-Installable builds are published from the latest successful build of the `master`
-branch:
+Installable builds are published with each stable release:
 
-<https://github.com/Obeo/bd1-timekeeper/releases/tag/build/master>
+<https://github.com/Obeo/bd1-timekeeper/releases/latest>
+
+Development builds remain available from the latest successful build of `master`:
+<https://github.com/Obeo/bd1-timekeeper/releases/tag/build/master>.
 
 Download the asset matching your operating system:
 
@@ -51,6 +53,17 @@ tar -xzf bd1-linux-x86_64.tar.gz
 
 Extract `bd1-macos-arm64.zip`, then open `BD-1.app`.
 
+### Updates
+
+BD-1 checks the latest stable GitHub release at startup and once every 24 hours.
+When a newer version is available, the tray menu offers the download for the
+current operating system and displays a system notification when supported. The
+downloaded installer or archive is never executed automatically.
+
+This check sends an HTTPS request to GitHub, which necessarily exposes the IP
+address and HTTP headers but no BD-1 data or telemetry. Set
+`"update_checks_enabled": false` in `settings.json` to disable it.
+
 ### Settings
 
 BD-1 creates a `settings.json` file in the user data directory resolved by
@@ -77,6 +90,7 @@ and `cpthost` on Linux:
     "aomhost64.exe",
     "cpthost"
   ],
+  "update_checks_enabled": true,
   "weekly_cap_hours": 37
 }
 ```

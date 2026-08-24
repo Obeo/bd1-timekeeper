@@ -7,7 +7,9 @@
 ; SPDX-License-Identifier: EPL-2.0
 
 #define MyAppName "BD-1"
-#define MyAppVersion "0.1.0"
+#ifndef MyAppVersion
+  #error MyAppVersion must be passed to ISCC with /DMyAppVersion=X.Y.Z
+#endif
 #define MyAppPublisher "Obeo"
 #define MyAppExeName "BD-1.exe"
 #define MyAppMutex "Local\BD1TimekeeperSingleInstance"

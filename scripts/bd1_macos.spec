@@ -6,13 +6,15 @@
 #
 # SPDX-License-Identifier: EPL-2.0
 
+from importlib.metadata import version
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, copy_metadata
 
 
 project_root = Path(SPECPATH).parent
-datas = collect_data_files("bd1") + collect_data_files("holidays")
+app_version = version("bd1")
+datas = collect_data_files("bd1") + collect_data_files("holidays") + copy_metadata("bd1")
 datas += [
     (str(project_root / filename), ".")
     for filename in ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md")
@@ -68,5 +70,9 @@ application = BUNDLE(
     name="BD-1.app",
     icon=str(project_root / "icons" / "macos" / "BD-1.icns"),
     bundle_identifier="com.bd1.app",
-    info_plist={"LSUIElement": True},
+    info_plist={
+        "LSUIElement": True,
+        "CFBundleShortVersionString": app_version,
+        "CFBundleVersion": app_version,
+    },
 )

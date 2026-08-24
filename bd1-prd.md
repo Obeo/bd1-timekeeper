@@ -368,6 +368,7 @@ Contient notamment :
 * seuil d'inactivité ;
 * lancement automatique ;
 * affichage des notifications ;
+* vérification automatique des mises à jour ;
 * thème de l'icône (éventuellement).
 
 ---
@@ -378,6 +379,7 @@ BD-1 peut afficher des notifications non bloquantes, par exemple :
 
 * démarrage réussi ;
 * rapport hebdomadaire disponible.
+* nouvelle version disponible.
 
 La V1 n'affiche pas de notifications demandant une action immédiate.
 
@@ -389,7 +391,8 @@ La V1 n'affiche pas de notifications demandant une action immédiate.
 * Consommation mémoire faible (< 50 Mo visée).
 * Démarrage rapide (< 2 s visé).
 * Aucune télémétrie.
-* Aucune donnée envoyée sur le réseau.
+* Aucune donnée métier envoyée pour vérifier les mises à jour ; seul un appel HTTPS
+  périodique à l'API GitHub Releases est effectué et peut être désactivé.
 * Base de données locale uniquement.
 
 ---

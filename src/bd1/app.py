@@ -104,6 +104,8 @@ class BD1Application:
             toggle_autostart=self.toggle_autostart,
             mattermost_settings_changed=self.mattermost_settings_changed,
             stop_callback=self.stop,
+            update_checks_enabled=self.settings.update_checks_enabled,
+            notifications_enabled=self.settings.notifications_enabled,
         )
         if self.activity_monitor is not None:
             self.activity_monitor.start()

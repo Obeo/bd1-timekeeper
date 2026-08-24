@@ -35,6 +35,7 @@ class Settings:
     idle_threshold_minutes: int = 16
     autostart_enabled: bool = False
     notifications_enabled: bool = True
+    update_checks_enabled: bool = True
     icon_theme: str = "head-small"
     activity_poll_seconds: float = 10.0
     heartbeat_interval_seconds: float = 300.0
@@ -75,7 +76,7 @@ def load_settings(path: Path | None = None) -> Settings:
         names = data[key]
         if isinstance(names, str):
             names = (names,)
-        elif not isinstance(names, (list, tuple)):
+        elif not isinstance(names, list | tuple):
             names = DEFAULT_VPN_INTERFACE_PATTERNS if key == "vpn_interface_patterns" else ()
         data[key] = tuple(str(name) for name in names if str(name))
         if key == "vpn_interface_patterns" and not data[key]:

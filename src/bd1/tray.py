@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import logging
 import threading
+import webbrowser
 from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
@@ -21,8 +23,11 @@ from bd1.models import ObservationType, RuntimeState
 from bd1.paths import icon_dir
 from bd1.report_window import ReportView, ReportWindow
 from bd1.storage import ObservationStore
+from bd1.updates import AvailableUpdate, find_update
 
 ObservationRecorder = Callable[[ObservationType, datetime | None, dict[str, object] | None], None]
+LOGGER = logging.getLogger(__name__)
+UPDATE_CHECK_INTERVAL_SECONDS = 86400
 
 
 class TrayIconName(StrEnum):
@@ -41,6 +46,8 @@ class TrayApp:
         toggle_autostart: Callable[[], bool],
         mattermost_settings_changed: Callable[[], None],
         stop_callback: Callable[[], None],
+        update_checks_enabled: bool = True,
+        notifications_enabled: bool = True,
     ) -> None:
         self.store = store
         self.add_observation = add_observation
@@ -48,6 +55,10 @@ class TrayApp:
         self.toggle_autostart = toggle_autostart
         self.mattermost_settings_changed = mattermost_settings_changed
         self.stop_callback = stop_callback
+        self.update_checks_enabled = update_checks_enabled
+        self.notifications_enabled = notifications_enabled
+        self.available_update: AvailableUpdate | None = None
+        self._update_check_stop = threading.Event()
         self.state = RuntimeState.PC_ON
         self._report_window: ReportWindow | None = None
         self._report_window_lock = threading.Lock()
@@ -56,9 +67,13 @@ class TrayApp:
         self.icon = pystray.Icon("BD-1", self._load_image(self.state), "BD-1", self._menu())
 
     def run(self) -> None:
-        self.icon.run()
+        if self.update_checks_enabled:
+            self.icon.run(setup=self._check_updates)
+        else:
+            self.icon.run()
 
     def stop(self) -> None:
+        self._update_check_stop.set()
         with self._report_window_lock:
             report_window = self._report_window
         if report_window is not None:
@@ -76,7 +91,7 @@ class TrayApp:
         self.icon.update_menu()
 
     def _menu(self) -> pystray.Menu:
-        return pystray.Menu(
+        items = [
             pystray.MenuItem("BD-1", None, enabled=False),
             pystray.MenuItem(f"État : {self._state_label()}", None, enabled=False),
             pystray.Menu.SEPARATOR,
@@ -112,9 +127,48 @@ class TrayApp:
                 lambda *_: self._toggle_autostart(),
                 checked=lambda _: self.autostart_is_enabled(),
             ),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quitter", lambda *_: self.stop_callback()),
+        ]
+        if self.available_update is not None:
+            items.extend(
+                (
+                    pystray.Menu.SEPARATOR,
+                    pystray.MenuItem(
+                        f"Télécharger BD-1 v{self.available_update.version}",
+                        lambda *_: self._download_update(),
+                    ),
+                )
+            )
+        items.extend(
+            (
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Quitter", lambda *_: self.stop_callback()),
+            )
         )
+        return pystray.Menu(*items)
+
+    def _check_updates(self, icon: pystray.Icon) -> None:
+        icon.visible = True
+        while not self._update_check_stop.is_set():
+            update = find_update()
+            if update is not None:
+                self.available_update = update
+                icon.menu = self._menu()
+                icon.update_menu()
+                if self.notifications_enabled and icon.HAS_NOTIFICATION:
+                    try:
+                        icon.notify(
+                            f"BD-1 v{update.version} est disponible au téléchargement.",
+                            "Mise à jour de BD-1",
+                        )
+                    except Exception:
+                        LOGGER.info("Could not display the update notification", exc_info=True)
+                return
+            if self._update_check_stop.wait(UPDATE_CHECK_INTERVAL_SECONDS):
+                return
+
+    def _download_update(self) -> None:
+        if self.available_update is not None:
+            webbrowser.open(self.available_update.download_url)
 
     def _toggle_autostart(self) -> None:
         self.toggle_autostart()

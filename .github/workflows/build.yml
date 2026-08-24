@@ -72,6 +72,11 @@ jobs:
           ruff format --check .
           python -m unittest discover -s tests -v
 
+      - name: Verify release tag matches package version
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: test "$GITHUB_REF_NAME" = "v$(python -c 'from importlib.metadata import version; print(version("bd1"))')"
+
       - name: Build with PyInstaller
         if: runner.os != 'macOS'
         shell: bash
@@ -85,6 +90,7 @@ jobs:
             --name BD-1 \
             --collect-data bd1 \
             --collect-data holidays \
+            --copy-metadata bd1 \
             ${{ matrix.pyinstaller_hidden_imports }} \
             scripts/bd1_entry.py
 
@@ -106,6 +112,7 @@ jobs:
         run: |
           test "$(plutil -extract LSUIElement raw dist/BD-1.app/Contents/Info.plist)" = "true"
           test "$(plutil -extract CFBundleIdentifier raw dist/BD-1.app/Contents/Info.plist)" = "com.bd1.app"
+          test "$(plutil -extract CFBundleShortVersionString raw dist/BD-1.app/Contents/Info.plist)" = "$(python -c 'from importlib.metadata import version; print(version("bd1"))')"
           icon_file="$(plutil -extract CFBundleIconFile raw dist/BD-1.app/Contents/Info.plist)"
           test -f "dist/BD-1.app/Contents/Resources/${icon_file}"
           test -f dist/BD-1.app/Contents/Resources/LICENSE
@@ -131,7 +138,9 @@ jobs:
       - name: Package Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
-        run: iscc scripts/windows-installer.iss
+        run: |
+          $version = python -c "from importlib.metadata import version; print(version('bd1'))"
+          iscc "/DMyAppVersion=$version" scripts/windows-installer.iss
 
       - name: Upload Linux artifact
         if: runner.os == 'Linux'
@@ -206,3 +215,29 @@ jobs:
           files: release-artifacts/*
           fail_on_unmatched_files: true
           overwrite_files: true
+
+  stable-release:
+    name: Publish stable release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bd1-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish stable release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: BD-1 ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: false
+          make_latest: true
+          files: release-artifacts/*
+          fail_on_unmatched_files: true

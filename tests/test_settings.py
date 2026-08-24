@@ -24,6 +24,9 @@ from bd1.settings import (
 
 
 class SettingsTest(unittest.TestCase):
+    def test_update_checks_are_enabled_by_default(self) -> None:
+        self.assertTrue(Settings().update_checks_enabled)
+
     def test_round_trips_idle_ignored_process_names(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "settings.json"
