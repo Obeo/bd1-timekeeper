@@ -50,6 +50,33 @@ class NetworkStatusTest(unittest.TestCase):
         self.assertEqual("10.0.0.7", status["local_address"])
         self.assertEqual("Ethernet", status["network_interface"])
 
+    def test_reports_windows_interface_description(self) -> None:
+        connection = Mock()
+        connection.__enter__ = Mock(return_value=connection)
+        connection.__exit__ = Mock(return_value=None)
+        connection.getsockname.return_value = ("192.169.32.38", 12345)
+        address_info = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.30.48", 443))]
+
+        with (
+            patch("bd1.network.socket.getaddrinfo", return_value=address_info),
+            patch("bd1.network.socket.socket", return_value=connection),
+            patch(
+                "bd1.network.psutil.net_if_addrs",
+                return_value={
+                    "Connexion au réseau local": [
+                        SimpleNamespace(family=socket.AF_INET, address="192.169.32.38")
+                    ]
+                },
+            ),
+            patch(
+                "bd1.network._windows_interface_description",
+                return_value="TAP-Windows Adapter V9",
+            ),
+        ):
+            status = network_status()
+
+        self.assertEqual("TAP-Windows Adapter V9", status["network_interface_description"])
+
     def test_classifies_physical_and_openvpn_interfaces(self) -> None:
         self.assertEqual(
             OFFICE,
@@ -73,6 +100,17 @@ class NetworkStatusTest(unittest.TestCase):
                         {"intranet_resolved": True, "network_interface": interface},
                     ),
                 )
+
+        self.assertEqual(
+            REMOTE,
+            work_location(
+                {
+                    "intranet_resolved": True,
+                    "network_interface": "Connexion au réseau local",
+                    "network_interface_description": "TAP-Windows Adapter V9",
+                },
+            ),
+        )
 
     def test_classifies_unresolved_or_unknown_route_as_remote(self) -> None:
         self.assertEqual(REMOTE, work_location({"intranet_resolved": False}))

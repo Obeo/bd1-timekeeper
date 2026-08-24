@@ -11,6 +11,8 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+- Detect Windows VPN adapters from their driver description when their connection name
+  is localized or renamed.
 - Notify users when a newer stable GitHub release is available for their platform.
 - Set an opt-in Mattermost custom status from the detected office or remote network.
 - Add a tray window for Mattermost URL, personal access token, and VPN settings.

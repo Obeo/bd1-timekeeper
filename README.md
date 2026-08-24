@@ -130,8 +130,10 @@ Service. Settings changed from the tray UI take effect immediately.
 BD-1 checks the network at startup and once per hour. A successful resolution of
 `intranet.obeo.fr` through a physical interface means office; a failed resolution
 or a route through OpenVPN means remote. Common `tun`, `tap`, `utun`, `ovpn`,
-OpenVPN, and Wintun interface names are recognized. Add renamed VPN interfaces to
-`vpn_interface_patterns` in `settings.json`, using case-insensitive glob patterns.
+OpenVPN, and Wintun interface names are recognized. On Windows, BD-1 also checks
+the adapter description so localized or renamed connections keep their driver
+identity. Add other VPN interface names to `vpn_interface_patterns` in
+`settings.json`, using case-insensitive glob patterns.
 
 An active custom status set manually in Mattermost takes precedence over BD-1.
 BD-1 statuses expire at the end of the local day and are refreshed the following
