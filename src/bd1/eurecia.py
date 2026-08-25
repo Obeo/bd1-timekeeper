@@ -456,12 +456,17 @@ def eurecia_days_from_report(
                     f"plafonné à {format_duration(_DAILY_MAX_SECONDS)} pour respecter "
                     "le maximum Eurecia."
                 )
-        remote = segments and any(
-            observation.type == ObservationType.APP_STARTED
-            and isinstance(observation.metadata, dict)
-            and "intranet_resolved" in observation.metadata
-            and work_location(observation.metadata, vpn_interface_patterns) == REMOTE
+        locations = [
+            work_location(observation.metadata, vpn_interface_patterns)
             for observation in day.observations
+            if (
+                observation.type == ObservationType.APP_STARTED
+                and isinstance(observation.metadata, dict)
+                and "intranet_resolved" in observation.metadata
+            )
+        ]
+        remote = bool(segments) and bool(locations) and all(
+            location == REMOTE for location in locations
         )
         result.append(EureciaDay(day_date, segments, REMOTE_COMMENT if remote else ""))
     return tuple(result)

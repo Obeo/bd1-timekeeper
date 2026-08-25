@@ -261,6 +261,40 @@ class ReportWindowHelpersTest(unittest.TestCase):
         self.assertEqual("Télétravail/Remote", days[0].comment)
         self.assertEqual("", days[1].comment)
 
+    def test_eurecia_export_prefers_an_office_signal_over_a_remote_signal(self) -> None:
+        day = DailyReport(
+            "2026-07-06",
+            (
+                Observation(
+                    datetime.fromisoformat("2026-07-06T08:55:00+02:00"),
+                    ObservationType.APP_STARTED,
+                    {
+                        "intranet_resolved": True,
+                        "network_interface": "OpenVPN Data Channel Offload",
+                    },
+                ),
+                Observation(
+                    datetime.fromisoformat("2026-07-06T09:05:00+02:00"),
+                    ObservationType.APP_STARTED,
+                    {"intranet_resolved": True, "network_interface": "Ethernet"},
+                ),
+            ),
+            (
+                TimeBlock(
+                    "work",
+                    datetime.fromisoformat("2026-07-06T09:00:00+02:00"),
+                    datetime.fromisoformat("2026-07-06T17:00:00+02:00"),
+                ),
+            ),
+            (),
+            (),
+        )
+
+        self.assertEqual(
+            "",
+            eurecia_days_from_report(WeeklyReport("2026-07-06", (day,)))[0].comment,
+        )
+
     def test_eurecia_export_caps_a_day_at_ten_hours_with_a_warning(self) -> None:
         wednesday = DailyReport(
             "2026-08-19",
