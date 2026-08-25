@@ -465,8 +465,8 @@ def eurecia_days_from_report(
                 and "intranet_resolved" in observation.metadata
             )
         ]
-        remote = bool(segments) and bool(locations) and all(
-            location == REMOTE for location in locations
+        remote = (
+            bool(segments) and bool(locations) and all(location == REMOTE for location in locations)
         )
         result.append(EureciaDay(day_date, segments, REMOTE_COMMENT if remote else ""))
     return tuple(result)
