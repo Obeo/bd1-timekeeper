@@ -11,12 +11,21 @@ from __future__ import annotations
 import io
 import json
 import unittest
+from importlib.metadata import PackageNotFoundError
 from unittest.mock import patch
 
-from bd1.updates import AvailableUpdate, find_update
+from bd1.updates import AvailableUpdate, find_update, installed_version
 
 
 class UpdateCheckTest(unittest.TestCase):
+    @patch("bd1.updates.version", return_value="0.2.0")
+    def test_reads_the_installed_version(self, _version) -> None:
+        self.assertEqual("0.2.0", installed_version())
+
+    @patch("bd1.updates.version", side_effect=PackageNotFoundError)
+    def test_uses_dev_when_the_package_is_not_installed(self, _version) -> None:
+        self.assertEqual("dev", installed_version())
+
     @patch("bd1.updates.urllib.request.urlopen")
     def test_returns_platform_asset_for_newer_release(self, urlopen) -> None:
         urlopen.return_value = _response(

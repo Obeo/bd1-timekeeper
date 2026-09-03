@@ -23,7 +23,7 @@ from bd1.models import ObservationType, RuntimeState
 from bd1.paths import icon_dir
 from bd1.report_window import ReportView, ReportWindow
 from bd1.storage import ObservationStore
-from bd1.updates import AvailableUpdate, find_update
+from bd1.updates import AvailableUpdate, find_update, installed_version
 
 ObservationRecorder = Callable[[ObservationType, datetime | None, dict[str, object] | None], None]
 LOGGER = logging.getLogger(__name__)
@@ -57,6 +57,7 @@ class TrayApp:
         self.stop_callback = stop_callback
         self.update_checks_enabled = update_checks_enabled
         self.notifications_enabled = notifications_enabled
+        self.current_version = installed_version()
         self.available_update: AvailableUpdate | None = None
         self._update_check_stop = threading.Event()
         self.state = RuntimeState.PC_ON
@@ -92,7 +93,7 @@ class TrayApp:
 
     def _menu(self) -> pystray.Menu:
         items = [
-            pystray.MenuItem("BD-1", None, enabled=False),
+            pystray.MenuItem(f"Version : BD-1 v{self.current_version}", None, enabled=False),
             pystray.MenuItem(f"État : {self._state_label()}", None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
@@ -120,6 +121,10 @@ class TrayApp:
                         lambda *_: self._show_mattermost_window(),
                     ),
                 ),
+            ),
+            pystray.MenuItem(
+                "Rechercher les mises à jour",
+                lambda *_: self._check_updates_now(),
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
@@ -151,20 +156,34 @@ class TrayApp:
         while not self._update_check_stop.is_set():
             update = find_update()
             if update is not None:
-                self.available_update = update
-                icon.menu = self._menu()
-                icon.update_menu()
-                if self.notifications_enabled and icon.HAS_NOTIFICATION:
-                    try:
-                        icon.notify(
-                            f"BD-1 v{update.version} est disponible au téléchargement.",
-                            "Mise à jour de BD-1",
-                        )
-                    except Exception:
-                        LOGGER.info("Could not display the update notification", exc_info=True)
+                self._set_available_update(icon, update)
                 return
             if self._update_check_stop.wait(UPDATE_CHECK_INTERVAL_SECONDS):
                 return
+
+    def _check_updates_now(self) -> None:
+        threading.Thread(target=self._check_updates_now_worker, daemon=True).start()
+
+    def _check_updates_now_worker(self) -> None:
+        update = find_update()
+        if update is None:
+            self._notify_update("Aucune nouvelle version détectée.")
+            return
+        self._set_available_update(self.icon, update)
+
+    def _set_available_update(self, icon: pystray.Icon, update: AvailableUpdate) -> None:
+        self.available_update = update
+        icon.menu = self._menu()
+        icon.update_menu()
+        self._notify_update(f"BD-1 v{update.version} est disponible au téléchargement.", icon)
+
+    def _notify_update(self, message: str, icon: pystray.Icon | None = None) -> None:
+        icon = icon or self.icon
+        if self.notifications_enabled and icon.HAS_NOTIFICATION:
+            try:
+                icon.notify(message, "Mise à jour de BD-1")
+            except Exception:
+                LOGGER.info("Could not display the update notification", exc_info=True)
 
     def _download_update(self) -> None:
         if self.available_update is not None:

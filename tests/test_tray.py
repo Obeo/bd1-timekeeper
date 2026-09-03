@@ -79,6 +79,26 @@ class TrayAppTest(unittest.TestCase):
             [item.text for item in configure.submenu.items],
         )
 
+    def test_exposes_current_version_and_manual_update_action(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                tray = TrayApp(
+                    store,
+                    lambda *_: None,
+                    lambda: False,
+                    lambda: False,
+                    lambda: None,
+                    lambda: None,
+                )
+                menu = tray.icon.menu
+            finally:
+                store.close()
+
+        labels = [item.text for item in menu.items]
+        self.assertIn("Version : BD-1 v0.2.0", labels)
+        self.assertIn("Rechercher les mises à jour", labels)
+
     def test_exposes_available_update_and_opens_download(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = ObservationStore(Path(tmp) / "bd1.db")
@@ -131,6 +151,30 @@ class TrayAppTest(unittest.TestCase):
         self.assertEqual("0.2.0", tray.available_update.version)
         icon.update_menu.assert_called_once_with()
         icon.notify.assert_called_once()
+
+    @patch("bd1.tray.find_update", return_value=None)
+    def test_manual_update_check_notifies_when_no_update_is_found(self, _find_update) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ObservationStore(Path(tmp) / "bd1.db")
+            try:
+                tray = TrayApp(
+                    store,
+                    lambda *_: None,
+                    lambda: False,
+                    lambda: False,
+                    lambda: None,
+                    lambda: None,
+                )
+                tray.icon.HAS_NOTIFICATION = True
+                with patch.object(tray.icon, "notify") as notify:
+                    tray._check_updates_now_worker()
+            finally:
+                store.close()
+
+        notify.assert_called_once_with(
+            "Aucune nouvelle version détectée.",
+            "Mise à jour de BD-1",
+        )
 
 
 if __name__ == "__main__":

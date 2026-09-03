@@ -31,6 +31,13 @@ class AvailableUpdate:
     download_url: str
 
 
+def installed_version() -> str:
+    try:
+        return version("bd1")
+    except PackageNotFoundError:
+        return "dev"
+
+
 def find_update(
     current_version: str | None = None,
     platform_name: str | None = None,
@@ -40,7 +47,7 @@ def find_update(
         return None
 
     try:
-        installed = _semantic_version(current_version or version("bd1"))
+        installed = _semantic_version(current_version or installed_version())
         request = urllib.request.Request(
             LATEST_RELEASE_URL,
             headers={
