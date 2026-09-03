@@ -431,10 +431,11 @@ def eurecia_days_from_report(
         day_date = date.fromisoformat(day.date)
         if not is_working_day(day_date):
             continue
-        segments = tuple(
-            EureciaSegment(block.start.strftime("%H:%M"), block.end.strftime("%H:%M"))
+        segment_times = (
+            (block.start.strftime("%H:%M"), block.end.strftime("%H:%M"))
             for block in sorted(day.work_blocks, key=lambda item: item.start)
         )
+        segments = tuple(EureciaSegment(start, end) for start, end in segment_times if start != end)
         worked_seconds = sum(segment.seconds for segment in segments)
         if worked_seconds > _DAILY_MAX_SECONDS:
             remaining = _DAILY_MAX_SECONDS

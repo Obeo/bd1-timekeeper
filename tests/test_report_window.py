@@ -261,6 +261,25 @@ class ReportWindowHelpersTest(unittest.TestCase):
         self.assertEqual("Télétravail/Remote", days[0].comment)
         self.assertEqual("", days[1].comment)
 
+    def test_eurecia_export_ignores_a_work_block_within_one_minute(self) -> None:
+        day = DailyReport(
+            "2026-09-02",
+            (),
+            (
+                TimeBlock(
+                    "work",
+                    datetime.fromisoformat("2026-09-02T08:20:19+02:00"),
+                    datetime.fromisoformat("2026-09-02T08:20:42+02:00"),
+                ),
+            ),
+            (),
+            (),
+        )
+
+        exported = eurecia_days_from_report(WeeklyReport("2026-08-31", (day,)))
+
+        self.assertEqual((), exported[0].segments)
+
     def test_eurecia_export_prefers_an_office_signal_over_a_remote_signal(self) -> None:
         day = DailyReport(
             "2026-07-06",
