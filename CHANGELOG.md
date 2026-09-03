@@ -11,6 +11,8 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+## 0.2.0 - 2026-09-03
+
 - Merge short work interruptions, including computer restarts, up to the configured
   inactivity threshold.
 - Detect Windows VPN adapters from their driver description when their connection name
@@ -21,4 +23,6 @@ All notable changes to BD-1 are documented in this file.
 - Add opt-in system credential storage for Eurecia passwords.
 - Support Eurecia editable forms that omit Standard row markers.
 - Mark remotely worked Eurecia days with a managed `Télétravail/Remote` comment.
+- Prefer office network signals over remote signals when marking Eurecia days.
+- Ignore work blocks shorter than one minute when exporting to Eurecia.
 - Prepare the project for distribution as open source under the EPL-2.0.
