@@ -30,6 +30,7 @@ from bd1.updates import AvailableUpdate, find_update, installed_version
 ObservationRecorder = Callable[[ObservationType, datetime | None, dict[str, object] | None], None]
 LOGGER = logging.getLogger(__name__)
 UPDATE_CHECK_INTERVAL_SECONDS = 86400
+_MACOS_DISPATCHER_CLASS = None
 
 
 class _MainThreadDispatcher:
@@ -56,15 +57,21 @@ class _MainThreadDispatcher:
 
 
 def _make_macos_dispatcher(dispatcher: _MainThreadDispatcher) -> object:
-    import Foundation
-    import objc
+    global _MACOS_DISPATCHER_CLASS
+    if _MACOS_DISPATCHER_CLASS is None:
+        import Foundation
+        import objc
 
-    class NativeDispatcher(Foundation.NSObject):
-        @objc.namedSelector(b"run:")
-        def run(self, _object: object) -> None:
-            dispatcher._run_pending()
+        class NativeDispatcher(Foundation.NSObject):
+            @objc.namedSelector(b"run:")
+            def run(self, _object: object) -> None:
+                self.dispatcher._run_pending()
 
-    return NativeDispatcher.alloc().init()
+        _MACOS_DISPATCHER_CLASS = NativeDispatcher
+
+    native = _MACOS_DISPATCHER_CLASS.alloc().init()
+    native.dispatcher = dispatcher
+    return native
 
 
 class TrayIconName(StrEnum):
