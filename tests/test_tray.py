@@ -96,7 +96,7 @@ class TrayAppTest(unittest.TestCase):
                 store.close()
 
         labels = [item.text for item in menu.items]
-        self.assertIn("Version : BD-1 v0.2.0", labels)
+        self.assertIn(f"Version : BD-1 v{tray.current_version}", labels)
         self.assertIn("Rechercher les mises à jour", labels)
 
     def test_exposes_available_update_and_opens_download(self) -> None:
