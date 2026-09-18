@@ -529,7 +529,7 @@ class EureciaHttpClient:
                 redirect = None
 
         if redirect:
-            self._login_sso(redirect, password)
+            self._login_sso(redirect, email, password)
         else:
             self._login_legacy(email, password)
         try:
@@ -563,50 +563,72 @@ class EureciaHttpClient:
             accept="text/html,application/xhtml+xml",
         )
 
-    def _login_sso(self, redirect: str, password: str) -> None:
+    def _login_sso(self, redirect: str, email: str, password: str) -> None:
         login_page = self._request_identity_provider("GET", redirect)
         parser = _parse_page(login_page.text())
-        candidates: list[tuple[_Form, _Control]] = []
-        for form in parser.forms:
-            passwords = [
+
+        def password_forms() -> list[tuple[_Form, _Control]]:
+            candidates: list[tuple[_Form, _Control]] = []
+            for form in parser.forms:
+                passwords = [
+                    control
+                    for control in form.controls
+                    if control.tag == "input" and control.type == "password" and control.name
+                ]
+                if len(passwords) == 1:
+                    candidates.append((form, passwords[0]))
+            return candidates
+
+        def submit(form: _Form, overrides: dict[int, str]) -> _HttpResponse:
+            submit_controls = [
                 control
                 for control in form.controls
-                if control.tag == "input" and control.type == "password" and control.name
+                if control.tag in {"button", "input"} and control.type == "submit"
             ]
-            if len(passwords) == 1:
-                candidates.append((form, passwords[0]))
+            if len(submit_controls) != 1:
+                raise EureciaError(
+                    "Expected exactly one submit button on the Eurecia identity provider, "
+                    f"found {len(submit_controls)}"
+                )
+            method = form.attrs.get("method", "GET").upper()
+            if method != "POST":
+                raise EureciaError(f"Expected the Eurecia SSO form to use POST, found {method}")
+            action = urljoin(login_page.url, form.attrs.get("action", "") or login_page.url)
+            payload = urllib.parse.urlencode(
+                _form_payload(form, submit_controls[0], overrides),
+                doseq=True,
+            ).encode()
+            return self._request_identity_provider(
+                "POST",
+                action,
+                data=payload,
+                content_type="application/x-www-form-urlencoded",
+                referer=login_page.url,
+            )
+
+        candidates = password_forms()
+        if not candidates:
+            username_candidates: list[tuple[_Form, _Control]] = []
+            for form in parser.forms:
+                usernames = [
+                    control
+                    for control in form.controls
+                    if control.tag == "input" and control.name == "username"
+                ]
+                if len(usernames) == 1:
+                    username_candidates.append((form, usernames[0]))
+            if len(username_candidates) == 1:
+                form, username_control = username_candidates[0]
+                login_page = submit(form, {username_control.index: email})
+                parser = _parse_page(login_page.text())
+                candidates = password_forms()
         if len(candidates) != 1:
             raise EureciaError(
                 "Expected exactly one password form on the Eurecia identity provider, "
                 f"found {len(candidates)}"
             )
         form, password_control = candidates[0]
-        submit_controls = [
-            control
-            for control in form.controls
-            if control.tag in {"button", "input"} and control.type == "submit"
-        ]
-        if len(submit_controls) != 1:
-            raise EureciaError(
-                "Expected exactly one submit button on the Eurecia identity provider, "
-                f"found {len(submit_controls)}"
-            )
-        submit = submit_controls[0]
-        method = form.attrs.get("method", "GET").upper()
-        if method != "POST":
-            raise EureciaError(f"Expected the Eurecia SSO form to use POST, found {method}")
-        action = urljoin(login_page.url, form.attrs.get("action", "") or login_page.url)
-        payload = urllib.parse.urlencode(
-            _form_payload(form, submit, {password_control.index: password}),
-            doseq=True,
-        ).encode()
-        self._request_identity_provider(
-            "POST",
-            action,
-            data=payload,
-            content_type="application/x-www-form-urlencoded",
-            referer=login_page.url,
-        )
+        submit(form, {password_control.index: password})
 
     def login_with_cookie(self, cookie_header: str) -> None:
         """Import an authenticated browser Cookie header into the in-memory jar."""

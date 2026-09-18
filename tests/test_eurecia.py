@@ -396,6 +396,64 @@ class EureciaTest(unittest.TestCase):
         )
         self.assertIn(b"password=secret", payload or b"")
 
+    def test_login_supports_two_step_identity_provider(self) -> None:
+        client = EureciaHttpClient("https://tenant.example/eurecia/")
+        tenant_responses = iter(
+            (
+                _response("text/html", b"<form></form>"),
+                _response(
+                    "application/json",
+                    b'{"redirectUrl":"https://plateforme-idp.eurecia.com/authorize"}',
+                ),
+                _response("application/json", b'{"user":{}}'),
+            )
+        )
+        idp_responses = iter(
+            (
+                _response(
+                    "text/html",
+                    b"""
+                    <form method="post" action="https://plateforme-idp.eurecia.com/login">
+                      <input type="text" name="username">
+                      <input type="submit" name="login" value="Connexion">
+                    </form>
+                    """,
+                    url="https://plateforme-idp.eurecia.com/authorize",
+                ),
+                _response(
+                    "text/html",
+                    b"""
+                    <form method="post" action="https://plateforme-idp.eurecia.com/authenticate">
+                      <input type="text" name="username" value="user@example.com" disabled>
+                      <input type="password" name="password">
+                      <input type="submit" name="login" value="Connexion">
+                    </form>
+                    """,
+                    url="https://plateforme-idp.eurecia.com/login",
+                ),
+                _response("text/html", b"authenticated"),
+            )
+        )
+        idp_requests: list[tuple[str, str, bytes | None]] = []
+
+        def request(method: str, url: str, **kwargs: object) -> _HttpResponse:
+            return next(tenant_responses)
+
+        def idp_request(method: str, url: str, **kwargs: object) -> _HttpResponse:
+            data = kwargs.get("data")
+            idp_requests.append((method, url, data if isinstance(data, bytes) else None))
+            return next(idp_responses)
+
+        client._request = request  # type: ignore[method-assign]
+        client._request_identity_provider = idp_request  # type: ignore[method-assign]
+
+        client.login("user@example.com", "secret")
+
+        self.assertEqual(["GET", "POST", "POST"], [item[0] for item in idp_requests])
+        self.assertIn(b"username=user%40example.com", idp_requests[1][2] or b"")
+        self.assertNotIn(b"password=", idp_requests[1][2] or b"")
+        self.assertIn(b"password=secret", idp_requests[2][2] or b"")
+
     def test_client_does_not_send_credentials_to_an_untrusted_idp(self) -> None:
         client = EureciaHttpClient("https://tenant.example/eurecia/")
 

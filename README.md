@@ -224,9 +224,9 @@ The base URL must include the application path, for example
 `https://<tenant>.eurecia.com/eurecia/`. Global options such as `--base-url`,
 `--email`, and `--browser-session` must appear before the subcommand.
 
-The client follows Eurecia's Keycloak SSO automatically when it exposes a single password
-form. If the account requires MFA or another interactive identity-provider screen, import an
-already authenticated browser session instead:
+The client follows Eurecia's Keycloak SSO automatically for its password and e-mail-first
+login forms. If the account requires MFA or another interactive identity-provider screen,
+import an already authenticated browser session instead:
 
 1. Open Eurecia normally in the browser and complete SSO.
 2. In the browser developer tools, open **Network** and reload Eurecia.
