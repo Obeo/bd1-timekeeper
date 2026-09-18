@@ -11,6 +11,10 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+## 0.2.1 - 2026-09-18
+
+- Support Eurecia SSO flows that ask for the e-mail address before the password.
+
 ## 0.2.0 - 2026-09-03
 
 - Merge short work interruptions, including computer restarts, up to the configured
