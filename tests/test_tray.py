@@ -15,6 +15,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from bd1.models import RuntimeState
 from bd1.report_window import ReportView
 from bd1.storage import ObservationStore
 from bd1.tray import TrayApp
@@ -124,6 +125,14 @@ class TrayAppTest(unittest.TestCase):
 
         self.assertIn("Télécharger BD-1 v0.2.0", [item.text for item in menu.items])
         open_browser.assert_called_once_with(tray.available_update.download_url)
+
+    def test_state_changes_are_dispatched_to_the_tray_ui(self) -> None:
+        tray = _tray_without_platform_icon()
+        tray._ui_dispatcher = Mock()
+
+        tray.set_state(RuntimeState.ACTIVE)
+
+        tray._ui_dispatcher.dispatch.assert_called_once()
 
     @patch("bd1.tray.find_update")
     def test_update_check_refreshes_menu_and_notifies(self, find_update) -> None:

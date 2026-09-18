@@ -9,11 +9,13 @@
 from __future__ import annotations
 
 import logging
+import sys
 import threading
 import webbrowser
 from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
+from queue import Empty, Queue
 
 import pystray
 from PIL import Image
@@ -28,6 +30,41 @@ from bd1.updates import AvailableUpdate, find_update, installed_version
 ObservationRecorder = Callable[[ObservationType, datetime | None, dict[str, object] | None], None]
 LOGGER = logging.getLogger(__name__)
 UPDATE_CHECK_INTERVAL_SECONDS = 86400
+
+
+class _MainThreadDispatcher:
+    def __init__(self) -> None:
+        self._callbacks: Queue[Callable[[], None]] = Queue()
+        self._native = _make_macos_dispatcher(self) if sys.platform == "darwin" else None
+
+    def dispatch(self, callback: Callable[[], None]) -> None:
+        if self._native is None or threading.current_thread() is threading.main_thread():
+            callback()
+            return
+        self._callbacks.put(callback)
+        self._native.performSelectorOnMainThread_withObject_waitUntilDone_("run:", None, False)
+
+    def _run_pending(self) -> None:
+        try:
+            callback = self._callbacks.get_nowait()
+        except Empty:
+            return
+        try:
+            callback()
+        except Exception:
+            LOGGER.exception("Could not update the macOS tray UI")
+
+
+def _make_macos_dispatcher(dispatcher: _MainThreadDispatcher) -> object:
+    import Foundation
+    import objc
+
+    class NativeDispatcher(Foundation.NSObject):
+        @objc.namedSelector(b"run:")
+        def run(self, _object: object) -> None:
+            dispatcher._run_pending()
+
+    return NativeDispatcher.alloc().init()
 
 
 class TrayIconName(StrEnum):
@@ -57,6 +94,7 @@ class TrayApp:
         self.stop_callback = stop_callback
         self.update_checks_enabled = update_checks_enabled
         self.notifications_enabled = notifications_enabled
+        self._ui_dispatcher = _MainThreadDispatcher()
         self.current_version = installed_version()
         self.available_update: AvailableUpdate | None = None
         self._update_check_stop = threading.Event()
@@ -83,9 +121,12 @@ class TrayApp:
             mattermost_window = self._mattermost_window
         if mattermost_window is not None:
             mattermost_window.close()
-        self.icon.stop()
+        self._ui_dispatcher.dispatch(self.icon.stop)
 
     def set_state(self, state: RuntimeState) -> None:
+        self._ui_dispatcher.dispatch(lambda: self._set_state_on_ui(state))
+
+    def _set_state_on_ui(self, state: RuntimeState) -> None:
         self.state = state
         self.icon.icon = self._load_image(state)
         self.icon.menu = self._menu()
@@ -152,7 +193,7 @@ class TrayApp:
         return pystray.Menu(*items)
 
     def _check_updates(self, icon: pystray.Icon) -> None:
-        icon.visible = True
+        self._ui_dispatcher.dispatch(lambda: setattr(icon, "visible", True))
         while not self._update_check_stop.is_set():
             update = find_update()
             if update is not None:
@@ -172,13 +213,19 @@ class TrayApp:
         self._set_available_update(self.icon, update)
 
     def _set_available_update(self, icon: pystray.Icon, update: AvailableUpdate) -> None:
+        self._ui_dispatcher.dispatch(lambda: self._set_available_update_on_ui(icon, update))
+
+    def _set_available_update_on_ui(self, icon: pystray.Icon, update: AvailableUpdate) -> None:
         self.available_update = update
         icon.menu = self._menu()
         icon.update_menu()
         self._notify_update(f"BD-1 v{update.version} est disponible au téléchargement.", icon)
 
     def _notify_update(self, message: str, icon: pystray.Icon | None = None) -> None:
-        icon = icon or self.icon
+        target = icon if icon is not None else self.icon
+        self._ui_dispatcher.dispatch(lambda: self._notify_update_on_ui(target, message))
+
+    def _notify_update_on_ui(self, icon: pystray.Icon, message: str) -> None:
         if self.notifications_enabled and icon.HAS_NOTIFICATION:
             try:
                 icon.notify(message, "Mise à jour de BD-1")
