@@ -1,0 +1,61 @@
+# Copyright (c) 2026 Obeo
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# https://www.eclipse.org/legal/epl-2.0/.
+#
+# SPDX-License-Identifier: EPL-2.0
+
+# BD-1 through Docker Compose: terminal only, no database, nothing running on
+# the host. Reports are built from logs the operating system already writes,
+# mounted read-only. The mounted paths exist on macOS only.
+#
+#   docker compose run --rm cli --report week --from-logs
+#   docker compose run --rm cli --report week --date 2026-09-10 --from-logs
+#   docker compose run --rm cli --push-eurecia 38 --from-logs
+#   docker compose run --rm eurecia show --year 2026 --week 38
+#   docker compose run --rm --build test
+#   docker compose run --rm ruff format .
+#
+# Eurecia tenant and e-mail come from bd1.env (copy bd1.env.example).
+
+x-cli: &cli
+  build:
+    context: .
+    target: cli
+  image: bd1-cli
+  environment:
+    TZ: ${TZ:-Europe/Paris}
+    BD1_POWER_LOG_DIR: /host/powermanagement
+    BD1_MATTERMOST_LOG: /host/logs/Mattermost/main.log
+  env_file:
+    - path: bd1.env
+      required: false
+  volumes:
+    - /private/var/log/powermanagement:/host/powermanagement:ro
+    - ${HOME}/Library/Logs:/host/logs:ro
+  stdin_open: true
+  tty: true
+
+services:
+  cli:
+    <<: *cli
+
+  eurecia:
+    <<: *cli
+    entrypoint: ["bd1-eurecia"]
+
+  test:
+    build:
+      context: .
+      target: test
+    image: bd1-test
+    volumes:
+      - ./src:/src/src:ro
+      - ./tests:/src/tests:ro
+
+  ruff:
+    image: bd1-test
+    entrypoint: ["ruff"]
+    volumes:
+      - ./:/src

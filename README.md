@@ -202,6 +202,41 @@ Eurecia credentials and printing each update step. To select another ISO year:
 bd1 --push-eurecia 29 --year 2026
 ```
 
+### Docker Compose
+
+The command-line tools, lint and unit tests also run in a container, without a
+local Python setup and without the tray application. Reports are then built from logs the operating
+system already writes, read after the fact: nothing runs or listens on the host,
+and no permission is requested.
+
+```bash
+cp bd1.env.example bd1.env   # Eurecia tenant URL and account e-mail
+docker compose run --rm cli --report week --from-logs
+docker compose run --rm cli --report week --date 2026-07-13 --from-logs
+docker compose run --rm cli --push-eurecia 29 --from-logs
+docker compose run --rm eurecia show --year 2026 --week 23
+docker compose run --rm --build test
+docker compose run --rm ruff format .
+```
+
+`--from-logs` reads every log source available on the machine and concatenates
+the events. **The log sources are macOS only for now**; the `compose.yml` mounts
+also assume a macOS host. The macOS power management log,
+`/private/var/log/powermanagement`, keeps about ten days of history: a display
+turned on starts a work segment; a display turned off, or an idle, lid or
+software sleep, ends it. Maintenance wakes and sleeps are ignored. The
+Mattermost desktop log, `~/Library/Logs/Mattermost/main.log` on macOS, adds the
+moments its window was shown. Reports show work time only, and an absence
+shorter than `idle_threshold_minutes` does not end a segment, as the live
+activity monitor would not have reported it either.
+Both folders are mounted read-only in the container. `BD1_POWER_LOG_DIR` and
+`BD1_MATTERMOST_LOG` override the paths, for example for a copy of the files
+on another system.
+
+The container has no credential store, so `--remember-eurecia-password` and
+`--remember-password` are not available there: the password is prompted at each
+run.
+
 ### Experimental Eurecia adapter
 
 `bd1-eurecia` is a lightweight prototype for the private Eurecia web interface. It uses

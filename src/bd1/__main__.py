@@ -14,11 +14,13 @@ import sys
 import sysconfig
 from contextlib import suppress
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from getpass import getpass
 from importlib.util import find_spec
 from multiprocessing import freeze_support
+from pathlib import Path
 
+from bd1.asl import AslError
 from bd1.eurecia import (
     EureciaError,
     EureciaHttpClient,
@@ -26,7 +28,10 @@ from bd1.eurecia import (
     login_interactively,
 )
 from bd1.formatting import format_daily_report, format_weekly_report
-from bd1.models import ObservationType, WeeklyReport
+from bd1.log_sources import observations_from_logs
+from bd1.mattermost_log import DEFAULT_MATTERMOST_LOG
+from bd1.models import Observation, ObservationType, WeeklyReport
+from bd1.power_log import DEFAULT_POWER_LOG_DIR
 from bd1.reports import ReportService
 from bd1.settings import Settings, load_settings, save_settings
 from bd1.storage import ObservationStore
@@ -58,6 +63,15 @@ def main() -> None:
         "--mark-working", action="store_true", help="Add a manual working observation."
     )
     parser.add_argument("--mark-break", action="store_true", help="Add a manual break observation.")
+    parser.add_argument(
+        "--from-logs",
+        action="store_true",
+        help=(
+            "Build the report from system logs instead of the database (macOS sources "
+            "only for now): the power management log (BD1_POWER_LOG_DIR) and the "
+            "Mattermost desktop log (BD1_MATTERMOST_LOG)."
+        ),
+    )
     parser.add_argument(
         "--diagnose-desktop",
         action="store_true",
@@ -93,6 +107,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.remember_eurecia_password and args.push_eurecia is None:
         parser.error("--remember-eurecia-password requires --push-eurecia")
+    if args.from_logs and (args.mark_working or args.mark_break):
+        parser.error("--mark-working and --mark-break write to the database, not to logs")
 
     if args.diagnose_desktop:
         print(_desktop_diagnostics())
@@ -112,7 +128,14 @@ def main() -> None:
         _show_mattermost_result(result)
         return
 
-    store = ObservationStore()
+    if args.from_logs:
+        store = ObservationStore(Path(":memory:"))
+        try:
+            store.add_many(_log_observations(load_settings()))
+        except (OSError, AslError) as error:
+            parser.exit(2, f"bd1: {error}\n")
+    else:
+        store = ObservationStore()
     try:
         if args.mark_working:
             store.add(ObservationType.USER_WORKING, metadata={"source": "cli"})
@@ -203,6 +226,21 @@ def main() -> None:
         ).run()
     finally:
         store.close()
+
+
+def _log_observations(settings: Settings) -> list[Observation]:
+    return observations_from_logs(
+        idle_threshold=timedelta(seconds=settings.idle_threshold_seconds),
+        power_log_dir=_configured_path("BD1_POWER_LOG_DIR", DEFAULT_POWER_LOG_DIR),
+        mattermost_log=_configured_path("BD1_MATTERMOST_LOG", DEFAULT_MATTERMOST_LOG),
+    )
+
+
+def _configured_path(environment_name: str, default: Path) -> Path:
+    configured = os.environ.get(environment_name)
+    if configured:
+        return Path(configured)
+    return default
 
 
 def _parse_date(value: str | None) -> date:

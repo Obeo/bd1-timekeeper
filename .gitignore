@@ -8,3 +8,4 @@ build/
 dist/
 bd1.db
 settings.json
+bd1.env
