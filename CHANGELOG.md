@@ -11,6 +11,10 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+- Run the command-line tools, lint, and tests through Docker Compose.
+- Build reports from the macOS power management log and the Mattermost desktop log,
+  without the tray application or any live listener (macOS hosts only for now).
+
 ## 0.2.0 - 2026-09-03
 
 - Merge short work interruptions, including computer restarts, up to the configured
