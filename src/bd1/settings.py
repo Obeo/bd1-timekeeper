@@ -44,6 +44,7 @@ class Settings:
     lunch_automatic_work_resume_time: str = DEFAULT_LUNCH_AUTOMATIC_WORK_RESUME_TIME
     weekly_37h_cap_enabled: bool = False
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS
+    weekly_top_up_enabled: bool = False
     mattermost_url: str = ""
     vpn_interface_patterns: tuple[str, ...] = DEFAULT_VPN_INTERFACE_PATTERNS
     eurecia_base_url: str = ""

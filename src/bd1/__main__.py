@@ -55,6 +55,14 @@ def main() -> None:
         help="Store a successfully authenticated Eurecia password.",
     )
     parser.add_argument(
+        "--weekly-target",
+        action="store_true",
+        help=(
+            "Complete each worked day up to its share of weekly_cap_hours and cap the week "
+            "at it, for --report week and --push-eurecia."
+        ),
+    )
+    parser.add_argument(
         "--mark-working", action="store_true", help="Add a manual working observation."
     )
     parser.add_argument("--mark-break", action="store_true", help="Add a manual break observation.")
@@ -138,6 +146,7 @@ def main() -> None:
                     report,
                     settings,
                     remember_password=args.remember_eurecia_password,
+                    weekly_target=args.weekly_target,
                 )
             except EureciaError as error:
                 parser.exit(
@@ -161,8 +170,9 @@ def main() -> None:
                 print(
                     format_weekly_report(
                         reports.weekly(target_date),
-                        apply_weekly_cap=settings.weekly_37h_cap_enabled,
+                        apply_weekly_cap=settings.weekly_37h_cap_enabled or args.weekly_target,
                         weekly_cap_hours=settings.weekly_cap_hours,
+                        top_up=settings.weekly_top_up_enabled or args.weekly_target,
                     )
                 )
             return
@@ -216,12 +226,16 @@ def _push_week_to_eurecia(
     settings: Settings,
     *,
     remember_password: bool = False,
+    weekly_target: bool = False,
 ) -> None:
+    apply_weekly_cap = settings.weekly_37h_cap_enabled or weekly_target
+    top_up = settings.weekly_top_up_enabled or weekly_target
     print(
         format_weekly_report(
             report,
-            apply_weekly_cap=settings.weekly_37h_cap_enabled,
+            apply_weekly_cap=apply_weekly_cap,
             weekly_cap_hours=settings.weekly_cap_hours,
+            top_up=top_up,
         )
     )
     if input("\nConfirmer l'envoi vers Eurecia ? [o/N] ").strip().casefold() not in {
@@ -255,8 +269,9 @@ def _push_week_to_eurecia(
 
     target_days = eurecia_days_from_report(
         report,
-        apply_weekly_cap=settings.weekly_37h_cap_enabled,
+        apply_weekly_cap=apply_weekly_cap,
         weekly_cap_hours=settings.weekly_cap_hours,
+        top_up=top_up,
         vpn_interface_patterns=settings.vpn_interface_patterns,
         warning=lambda message: print(f"AVERTISSEMENT — {message}"),
     )

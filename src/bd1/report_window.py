@@ -718,9 +718,12 @@ class _ReportWindowUI:
                     report,
                     apply_weekly_cap=self.settings.weekly_37h_cap_enabled,
                     weekly_cap_hours=self.settings.weekly_cap_hours,
+                    top_up=self.settings.weekly_top_up_enabled,
                 )
                 worked_seconds = (
-                    report.declaration_for(self.settings.weekly_cap_hours).proposed_seconds
+                    report.declaration_for(
+                        self.settings.weekly_cap_hours, self.settings.weekly_top_up_enabled
+                    ).proposed_seconds
                     if self.settings.weekly_37h_cap_enabled
                     else report.worked_seconds
                 )
@@ -930,9 +933,12 @@ def _displayed_week_days(
     report: WeeklyReport,
     apply_weekly_cap: bool,
     weekly_cap_hours: int,
+    top_up: bool = False,
 ) -> tuple[DailyReport, ...]:
     report_days = (
-        report.declaration_for(weekly_cap_hours).proposed_days if apply_weekly_cap else report.days
+        report.declaration_for(weekly_cap_hours, top_up).proposed_days
+        if apply_weekly_cap
+        else report.days
     )
     return tuple(day for day in report_days if is_working_day(date.fromisoformat(day.date)))
 

@@ -11,6 +11,9 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+- Complete each worked day up to its share of the weekly target, with the
+  `weekly_top_up_enabled` setting or the `--weekly-target` option.
+
 ## 0.2.2 - 2026-09-18
 
 - Marshal macOS tray updates to the main thread for compatibility with macOS 27.

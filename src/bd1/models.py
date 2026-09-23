@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 from typing import Any
 
@@ -113,20 +113,56 @@ class WeeklyReport:
     def declaration(self) -> WeeklyDeclaration:
         return self.declaration_for(WEEKLY_DECLARATION_TARGET_HOURS)
 
-    def declaration_for(self, target_hours: int) -> WeeklyDeclaration:
+    def declaration_for(self, target_hours: int, top_up: bool = False) -> WeeklyDeclaration:
         target_seconds = target_hours * 3600
+        days = self._workdays
+        if top_up and self._working_day_count:
+            days = _topped_up_days(days, target_seconds // self._working_day_count)
         return WeeklyDeclaration(
             target_seconds=target_seconds,
             estimated_seconds=self.worked_seconds,
-            proposed_days=_weekly_declaration_days(
-                self._workdays,
-                target_seconds,
-            ),
+            proposed_days=_weekly_declaration_days(days, target_seconds),
         )
+
+    @property
+    def _working_day_count(self) -> int:
+        start = date.fromisoformat(self.week_start)
+        return sum(1 for offset in range(7) if is_working_day(start + timedelta(days=offset)))
 
     @property
     def _workdays(self) -> tuple[DailyReport, ...]:
         return tuple(day for day in self.days if is_working_day(date.fromisoformat(day.date)))
+
+
+def _topped_up_days(
+    days: tuple[DailyReport, ...],
+    daily_target_seconds: int,
+) -> tuple[DailyReport, ...]:
+    """Extend the last work block of each worked day up to the daily target."""
+    result = []
+    for day in days:
+        missing = daily_target_seconds - day.worked_seconds
+        if day.worked_seconds == 0 or missing <= 0:
+            result.append(day)
+            continue
+        last = max(day.work_blocks, key=lambda block: block.end)
+        end_of_day = datetime.combine(last.end.date(), time(23, 59), tzinfo=last.end.tzinfo)
+        extended = TimeBlock(
+            label=last.label,
+            start=last.start,
+            end=min(last.end + timedelta(seconds=missing), end_of_day),
+        )
+        blocks = tuple(extended if block is last else block for block in day.work_blocks)
+        result.append(
+            DailyReport(
+                date=day.date,
+                observations=day.observations,
+                work_blocks=blocks,
+                break_blocks=day.break_blocks,
+                anomalies=day.anomalies,
+            )
+        )
+    return tuple(result)
 
 
 def _weekly_declaration_days(

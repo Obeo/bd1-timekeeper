@@ -58,9 +58,10 @@ def format_weekly_report(
     report: WeeklyReport,
     apply_weekly_cap: bool = False,
     weekly_cap_hours: int = WEEKLY_DECLARATION_TARGET_HOURS,
+    top_up: bool = False,
 ) -> str:
     lines = [f"BD-1 weekly report - week of {report.week_start}", ""]
-    declaration = report.declaration_for(weekly_cap_hours) if apply_weekly_cap else None
+    declaration = report.declaration_for(weekly_cap_hours, top_up) if apply_weekly_cap else None
     days = declaration.proposed_days if declaration is not None else report.days
     for day in days:
         if not is_working_day(datetime.fromisoformat(day.date).date()):

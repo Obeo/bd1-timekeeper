@@ -420,11 +420,14 @@ def eurecia_days_from_report(
     *,
     apply_weekly_cap: bool = False,
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS,
+    top_up: bool = False,
     vpn_interface_patterns: tuple[str, ...] = DEFAULT_VPN_INTERFACE_PATTERNS,
     warning: Callable[[str], None] | None = None,
 ) -> tuple[EureciaDay, ...]:
     report_days = (
-        report.declaration_for(weekly_cap_hours).proposed_days if apply_weekly_cap else report.days
+        report.declaration_for(weekly_cap_hours, top_up).proposed_days
+        if apply_weekly_cap
+        else report.days
     )
     result: list[EureciaDay] = []
     for day in report_days:

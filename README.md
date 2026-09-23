@@ -112,6 +112,17 @@ The `weekly_cap_hours` setting controls the weekly target used when the
 For local testing, it can be set to a lower value such as `20`. Invalid or
 non-positive values fall back to `37`.
 
+#### weekly_top_up_enabled
+
+With `Plafond 37h` enabled, the week is only trimmed when it exceeds the target.
+`weekly_top_up_enabled` also completes each worked day below its share of the
+target, `weekly_cap_hours` divided by the working days of the week, by extending
+its last work segment; the week is then capped at the target as usual. Days
+without any work are left empty. The observed start times and breaks are kept,
+only the end of the day moves. It defaults to `false`. The `--weekly-target`
+option of `bd1 --report week` and `bd1 --push-eurecia` applies both the cap and
+the top-up for one run.
+
 #### Mattermost status
 
 BD-1 can set your Mattermost custom status to `In the office` or
@@ -181,6 +192,7 @@ bd1 --report today
 bd1 --report week
 bd1 --push-eurecia 29
 bd1 --push-eurecia 29 --remember-eurecia-password
+bd1 --push-eurecia 29 --weekly-target
 bd1 --mark-working
 bd1 --mark-break
 bd1 --diagnose-desktop
