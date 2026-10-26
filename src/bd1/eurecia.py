@@ -37,7 +37,11 @@ from bd1.calendar import is_working_day
 from bd1.formatting import format_duration
 from bd1.models import ObservationType, WeeklyReport
 from bd1.network import REMOTE, work_location
-from bd1.settings import DEFAULT_VPN_INTERFACE_PATTERNS, DEFAULT_WEEKLY_CAP_HOURS
+from bd1.settings import (
+    DEFAULT_VPN_INTERFACE_PATTERNS,
+    DEFAULT_WEEKLY_CAP_HOURS,
+    DEFAULT_WEEKLY_TOP_UP_HOURS,
+)
 
 _TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _WEEK_PATTERN = re.compile(
@@ -421,11 +425,14 @@ def eurecia_days_from_report(
     apply_weekly_cap: bool = False,
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS,
     top_up: bool = False,
+    weekly_top_up_hours: int = DEFAULT_WEEKLY_TOP_UP_HOURS,
     vpn_interface_patterns: tuple[str, ...] = DEFAULT_VPN_INTERFACE_PATTERNS,
     warning: Callable[[str], None] | None = None,
 ) -> tuple[EureciaDay, ...]:
     report_days = (
-        report.declaration_for(weekly_cap_hours, top_up).proposed_days
+        report.declaration_for(
+            weekly_cap_hours, top_up, top_up_hours=weekly_top_up_hours
+        ).proposed_days
         if apply_weekly_cap
         else report.days
     )

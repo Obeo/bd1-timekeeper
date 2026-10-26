@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta
 from unittest.mock import Mock
 
 from bd1.eurecia import eurecia_days_from_report
-from bd1.formatting import format_duration
+from bd1.formatting import format_duration, format_weekly_report
 from bd1.models import (
     WEEKLY_DECLARATION_TARGET_SECONDS,
     DailyReport,
@@ -260,6 +260,45 @@ class ReportWindowHelpersTest(unittest.TestCase):
         self.assertEqual((), days[1].segments)
         self.assertEqual("Télétravail/Remote", days[0].comment)
         self.assertEqual("", days[1].comment)
+
+    def test_top_up_target_is_shared_by_reports_and_eurecia_export(self) -> None:
+        days = []
+        for day in range(14, 19):
+            start = datetime.fromisoformat(f"2026-09-{day:02d}T09:00:00+02:00")
+            days.append(
+                DailyReport(
+                    start.date().isoformat(),
+                    (Observation(start, ObservationType.FIRST_ACTIVITY),),
+                    (
+                        TimeBlock("work", start, start + timedelta(hours=3)),
+                        TimeBlock("work", start + timedelta(hours=5), start + timedelta(hours=8)),
+                    ),
+                    (TimeBlock("break", start + timedelta(hours=3), start + timedelta(hours=5)),),
+                    (),
+                )
+            )
+        report = WeeklyReport("2026-09-14", tuple(days))
+        text = TextBuffer()
+        options = {
+            "apply_weekly_cap": True,
+            "weekly_cap_hours": 37,
+            "top_up": True,
+            "weekly_top_up_hours": 36,
+        }
+
+        _render_weekly(text, report, **options)
+        formatted = format_weekly_report(report, **options)
+        exported = eurecia_days_from_report(report, **options)
+
+        self.assertEqual(5, text.rendered().count("Travail estimé : 7 h 12"))
+        self.assertIn("Weekly total: 36 h 00", formatted)
+        self.assertIn("Break: 12:00 -> 14:00", formatted)
+        self.assertEqual(5, len(exported))
+        for day in exported:
+            self.assertEqual(
+                (("09:00", "12:00"), ("14:00", "18:12")),
+                tuple((segment.start, segment.end) for segment in day.segments),
+            )
 
     def test_eurecia_export_ignores_a_work_block_within_one_minute(self) -> None:
         day = DailyReport(

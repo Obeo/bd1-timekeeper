@@ -107,21 +107,40 @@ open until 13:58. Use the `HH:MM` format. Missing or invalid values fall back to
 
 #### weekly_cap_hours
 
-The `weekly_cap_hours` setting controls the weekly target used when the
+The `weekly_cap_hours` setting controls the weekly ceiling used when the
 `Plafond 37h` option is enabled in the weekly report. It defaults to `37`.
 For local testing, it can be set to a lower value such as `20`. Invalid or
 non-positive values fall back to `37`.
 
 #### weekly_top_up_enabled
 
-With `Plafond 37h` enabled, the week is only trimmed when it exceeds the target.
+With `Plafond 37h` enabled, the week is only trimmed when it exceeds the ceiling.
 `weekly_top_up_enabled` also completes each worked day below its share of the
-target, `weekly_cap_hours` divided by the working days of the week, by extending
-its last work segment; the week is then capped at the target as usual. Days
+target, `weekly_top_up_hours` divided by the working days of the week, by extending
+its last work segment; the week is then capped at `weekly_cap_hours` as usual. Days
 without any work are left empty. The observed start times and breaks are kept,
 only the end of the day moves. It defaults to `false`. The `--weekly-target`
 option of `bd1 --report week` and `bd1 --push-eurecia` applies both the cap and
 the top-up for one run.
+
+#### weekly_top_up_hours
+
+The `weekly_top_up_hours` setting controls the weekly top-up target independently
+of the ceiling. It is only exposed in `settings.json` and defaults to `37`.
+It accepts positive whole hours; missing or invalid values fall back to `37`.
+For example, the following settings top up worked days towards a 36-hour week
+while keeping a 37-hour ceiling, leaving some margin for vacations and other
+adjustments. Days already above their share of 36 hours are kept unless the
+week exceeds the ceiling.
+
+```json
+{
+  "weekly_37h_cap_enabled": true,
+  "weekly_cap_hours": 37,
+  "weekly_top_up_enabled": true,
+  "weekly_top_up_hours": 36
+}
+```
 
 #### Mattermost status
 

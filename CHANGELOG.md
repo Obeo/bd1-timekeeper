@@ -13,6 +13,8 @@ All notable changes to BD-1 are documented in this file.
 
 - Complete each worked day up to its share of the weekly target, with the
   `weekly_top_up_enabled` setting or the `--weekly-target` option.
+- Configure `weekly_top_up_hours` independently of `weekly_cap_hours` to leave
+  margin below the weekly ceiling. Both default to 37 hours.
 
 ## 0.2.2 - 2026-09-18
 
