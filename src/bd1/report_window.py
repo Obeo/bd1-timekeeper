@@ -40,7 +40,13 @@ from bd1.models import (
     WeeklyReport,
 )
 from bd1.reports import ReportService
-from bd1.settings import DEFAULT_WEEKLY_CAP_HOURS, Settings, load_settings, save_settings
+from bd1.settings import (
+    DEFAULT_WEEKLY_CAP_HOURS,
+    DEFAULT_WEEKLY_TOP_UP_HOURS,
+    Settings,
+    load_settings,
+    save_settings,
+)
 from bd1.window_icon import apply_window_icon
 
 
@@ -505,6 +511,8 @@ class _ReportWindowUI:
             report = self.report_service.weekly(current_date)
             apply_weekly_cap = self.settings.weekly_37h_cap_enabled
             weekly_cap_hours = self.settings.weekly_cap_hours
+            top_up = self.settings.weekly_top_up_enabled
+            weekly_top_up_hours = self.settings.weekly_top_up_hours
             email = self.settings.eurecia_email
             week = date.fromisoformat(report.week_start).isocalendar()
             remember_password = self._eurecia_remember_password
@@ -563,6 +571,8 @@ class _ReportWindowUI:
                         report,
                         apply_weekly_cap=apply_weekly_cap,
                         weekly_cap_hours=weekly_cap_hours,
+                        top_up=top_up,
+                        weekly_top_up_hours=weekly_top_up_hours,
                         vpn_interface_patterns=self.settings.vpn_interface_patterns,
                         warning=lambda message: events.put(("warning", message)),
                     )
@@ -719,10 +729,13 @@ class _ReportWindowUI:
                     apply_weekly_cap=self.settings.weekly_37h_cap_enabled,
                     weekly_cap_hours=self.settings.weekly_cap_hours,
                     top_up=self.settings.weekly_top_up_enabled,
+                    weekly_top_up_hours=self.settings.weekly_top_up_hours,
                 )
                 worked_seconds = (
                     report.declaration_for(
-                        self.settings.weekly_cap_hours, self.settings.weekly_top_up_enabled
+                        self.settings.weekly_cap_hours,
+                        self.settings.weekly_top_up_enabled,
+                        top_up_hours=self.settings.weekly_top_up_hours,
                     ).proposed_seconds
                     if self.settings.weekly_37h_cap_enabled
                     else report.worked_seconds
@@ -905,9 +918,13 @@ def _render_weekly(
     report: WeeklyReport,
     apply_weekly_cap: bool = False,
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS,
+    top_up: bool = False,
+    weekly_top_up_hours: int = DEFAULT_WEEKLY_TOP_UP_HOURS,
 ) -> None:
     _clear(text)
-    days = _displayed_week_days(report, apply_weekly_cap, weekly_cap_hours)
+    days = _displayed_week_days(
+        report, apply_weekly_cap, weekly_cap_hours, top_up, weekly_top_up_hours
+    )
     for index, day in enumerate(days):
         day_date = date.fromisoformat(day.date)
         tag = f"day-heading-{day.date}"
@@ -934,9 +951,12 @@ def _displayed_week_days(
     apply_weekly_cap: bool,
     weekly_cap_hours: int,
     top_up: bool = False,
+    weekly_top_up_hours: int = DEFAULT_WEEKLY_TOP_UP_HOURS,
 ) -> tuple[DailyReport, ...]:
     report_days = (
-        report.declaration_for(weekly_cap_hours, top_up).proposed_days
+        report.declaration_for(
+            weekly_cap_hours, top_up, top_up_hours=weekly_top_up_hours
+        ).proposed_days
         if apply_weekly_cap
         else report.days
     )

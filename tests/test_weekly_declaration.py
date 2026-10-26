@@ -117,7 +117,7 @@ class WeeklyTopUpTest(unittest.TestCase):
             ),
         )
 
-        declaration = report.declaration_for(35, top_up=True)
+        declaration = report.declaration_for(35, top_up=True, top_up_hours=35)
 
         hours = [day.worked_seconds // 3600 for day in declaration.proposed_days]
         self.assertEqual([7, 7, 7, 7, 7], hours)
@@ -133,7 +133,7 @@ class WeeklyTopUpTest(unittest.TestCase):
             ),
         )
 
-        declaration = report.declaration_for(35, top_up=True)
+        declaration = report.declaration_for(35, top_up=True, top_up_hours=35)
 
         self.assertEqual(35 * 3600, declaration.proposed_seconds)
 
@@ -143,10 +143,48 @@ class WeeklyTopUpTest(unittest.TestCase):
             (_day("2026-09-14", 6), _day("2026-09-15", 0), _day("2026-09-16", 6)),
         )
 
-        declaration = report.declaration_for(35, top_up=True)
+        declaration = report.declaration_for(35, top_up=True, top_up_hours=35)
 
         hours = [day.worked_seconds // 3600 for day in declaration.proposed_days]
         self.assertEqual([7, 0, 7], hours)
+
+    def test_top_up_target_can_leave_margin_below_the_ceiling(self) -> None:
+        report = WeeklyReport(
+            "2026-09-14",
+            tuple(_day(f"2026-09-{day:02d}", 6) for day in range(14, 19)),
+        )
+
+        declaration = report.declaration_for(37, top_up=True, top_up_hours=35)
+
+        self.assertEqual(35 * 3600, declaration.proposed_seconds)
+        self.assertEqual(37 * 3600, declaration.target_seconds)
+        self.assertEqual(30 * 3600, report.worked_seconds)
+
+    def test_lower_top_up_target_keeps_longer_days_below_the_ceiling(self) -> None:
+        report = WeeklyReport(
+            "2026-09-14",
+            tuple(
+                _day(f"2026-09-{day:02d}", hours)
+                for day, hours in zip(range(14, 19), (6, 7, 6, 8, 7), strict=True)
+            ),
+        )
+
+        declaration = report.declaration_for(37, top_up=True, top_up_hours=35)
+
+        self.assertEqual(
+            [7 * 3600, 7 * 3600, 7 * 3600, 8 * 3600, 7 * 3600],
+            [day.worked_seconds for day in declaration.proposed_days],
+        )
+
+    def test_top_up_above_the_ceiling_is_still_capped(self) -> None:
+        report = WeeklyReport(
+            "2026-09-14",
+            tuple(_day(f"2026-09-{day:02d}", 6) for day in range(14, 19)),
+        )
+
+        declaration = report.declaration_for(37, top_up=True, top_up_hours=40)
+
+        self.assertEqual(37 * 3600, declaration.proposed_seconds)
 
 
 def _day(day: str, hours: int) -> DailyReport:

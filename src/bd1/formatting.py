@@ -19,6 +19,7 @@ from bd1.models import (
     TimeBlock,
     WeeklyReport,
 )
+from bd1.settings import DEFAULT_WEEKLY_TOP_UP_HOURS
 
 
 def format_duration(seconds: int) -> str:
@@ -59,9 +60,14 @@ def format_weekly_report(
     apply_weekly_cap: bool = False,
     weekly_cap_hours: int = WEEKLY_DECLARATION_TARGET_HOURS,
     top_up: bool = False,
+    weekly_top_up_hours: int = DEFAULT_WEEKLY_TOP_UP_HOURS,
 ) -> str:
     lines = [f"BD-1 weekly report - week of {report.week_start}", ""]
-    declaration = report.declaration_for(weekly_cap_hours, top_up) if apply_weekly_cap else None
+    declaration = (
+        report.declaration_for(weekly_cap_hours, top_up, top_up_hours=weekly_top_up_hours)
+        if apply_weekly_cap
+        else None
+    )
     days = declaration.proposed_days if declaration is not None else report.days
     for day in days:
         if not is_working_day(datetime.fromisoformat(day.date).date()):

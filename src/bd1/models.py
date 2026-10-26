@@ -14,7 +14,7 @@ from enum import StrEnum
 from typing import Any
 
 from bd1.calendar import is_working_day
-from bd1.settings import DEFAULT_WEEKLY_CAP_HOURS
+from bd1.settings import DEFAULT_WEEKLY_CAP_HOURS, DEFAULT_WEEKLY_TOP_UP_HOURS
 
 
 class ObservationType(StrEnum):
@@ -113,11 +113,17 @@ class WeeklyReport:
     def declaration(self) -> WeeklyDeclaration:
         return self.declaration_for(WEEKLY_DECLARATION_TARGET_HOURS)
 
-    def declaration_for(self, target_hours: int, top_up: bool = False) -> WeeklyDeclaration:
+    def declaration_for(
+        self,
+        target_hours: int,
+        top_up: bool = False,
+        *,
+        top_up_hours: int = DEFAULT_WEEKLY_TOP_UP_HOURS,
+    ) -> WeeklyDeclaration:
         target_seconds = target_hours * 3600
         days = self._workdays
         if top_up and self._working_day_count:
-            days = _topped_up_days(days, target_seconds // self._working_day_count)
+            days = _topped_up_days(days, top_up_hours * 3600 // self._working_day_count)
         return WeeklyDeclaration(
             target_seconds=target_seconds,
             estimated_seconds=self.worked_seconds,

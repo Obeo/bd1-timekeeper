@@ -20,6 +20,7 @@ LUNCH_AUTOMATIC_WORK_RESUME_TIME_MIN = "12:00"
 LUNCH_AUTOMATIC_WORK_RESUME_TIME_MAX = "14:00"
 DEFAULT_IDLE_THRESHOLD_MINUTES = 16
 DEFAULT_WEEKLY_CAP_HOURS = 37
+DEFAULT_WEEKLY_TOP_UP_HOURS = 37
 DEFAULT_VPN_INTERFACE_PATTERNS = (
     "tun*",
     "tap*",
@@ -45,6 +46,7 @@ class Settings:
     weekly_37h_cap_enabled: bool = False
     weekly_cap_hours: int = DEFAULT_WEEKLY_CAP_HOURS
     weekly_top_up_enabled: bool = False
+    weekly_top_up_hours: int = DEFAULT_WEEKLY_TOP_UP_HOURS
     mattermost_url: str = ""
     vpn_interface_patterns: tuple[str, ...] = DEFAULT_VPN_INTERFACE_PATTERNS
     eurecia_base_url: str = ""
@@ -94,6 +96,11 @@ def load_settings(path: Path | None = None) -> Settings:
         data["weekly_cap_hours"] = normalize_weekly_cap_hours(
             data["weekly_cap_hours"],
             DEFAULT_WEEKLY_CAP_HOURS,
+        )
+    if "weekly_top_up_hours" in data:
+        data["weekly_top_up_hours"] = normalize_weekly_cap_hours(
+            data["weekly_top_up_hours"],
+            DEFAULT_WEEKLY_TOP_UP_HOURS,
         )
     return Settings(**data)
 

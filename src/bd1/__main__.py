@@ -58,8 +58,8 @@ def main() -> None:
         "--weekly-target",
         action="store_true",
         help=(
-            "Complete each worked day up to its share of weekly_cap_hours and cap the week "
-            "at it, for --report week and --push-eurecia."
+            "Complete each worked day up to its share of weekly_top_up_hours and cap the week "
+            "at weekly_cap_hours, for --report week and --push-eurecia."
         ),
     )
     parser.add_argument(
@@ -173,6 +173,7 @@ def main() -> None:
                         apply_weekly_cap=settings.weekly_37h_cap_enabled or args.weekly_target,
                         weekly_cap_hours=settings.weekly_cap_hours,
                         top_up=settings.weekly_top_up_enabled or args.weekly_target,
+                        weekly_top_up_hours=settings.weekly_top_up_hours,
                     )
                 )
             return
@@ -236,6 +237,7 @@ def _push_week_to_eurecia(
             apply_weekly_cap=apply_weekly_cap,
             weekly_cap_hours=settings.weekly_cap_hours,
             top_up=top_up,
+            weekly_top_up_hours=settings.weekly_top_up_hours,
         )
     )
     if input("\nConfirmer l'envoi vers Eurecia ? [o/N] ").strip().casefold() not in {
@@ -272,6 +274,7 @@ def _push_week_to_eurecia(
         apply_weekly_cap=apply_weekly_cap,
         weekly_cap_hours=settings.weekly_cap_hours,
         top_up=top_up,
+        weekly_top_up_hours=settings.weekly_top_up_hours,
         vpn_interface_patterns=settings.vpn_interface_patterns,
         warning=lambda message: print(f"AVERTISSEMENT — {message}"),
     )
