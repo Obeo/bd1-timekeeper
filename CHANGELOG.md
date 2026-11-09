@@ -11,6 +11,8 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+## 0.2.3 - 2026-11-09
+
 - Keep Eurecia rows associated with their day when absence descriptions contain
   a date range, preserving synchronized vacation rows during work exports.
 - Complete each worked day up to its share of the weekly target, with the
