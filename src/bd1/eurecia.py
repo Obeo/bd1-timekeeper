@@ -1248,17 +1248,15 @@ def _legacy_days(
         return None
 
     rows_by_day: dict[date, list[EureciaSegment]] = {day: [] for day in days}
-    active_day: date | None = None
-    for row, controls in sorted(controls_by_row.items()):
-        row_text = _collapse(parser.row_text.get(controls[0].row_key, []))
-        active_day = _match_date(row_text, days) or active_day
-        if active_day is None:
-            raise EureciaError(f"Cannot associate Eurecia row_{row} with a date")
-        if not _legacy_row_is_editable(form, row) and not _legacy_row_is_standard(form, row):
-            continue
-        segment = _legacy_row_segment(row, row_text, controls)
-        if segment is not None:
-            rows_by_day[active_day].append(segment)
+    for active_day, rows in _legacy_rows_by_day(parser, form, days).items():
+        for row in rows:
+            controls = controls_by_row[row]
+            row_text = _collapse(parser.row_text.get(controls[0].row_key, []))
+            if not _legacy_row_is_editable(form, row) and not _legacy_row_is_standard(form, row):
+                continue
+            segment = _legacy_row_segment(row, row_text, controls)
+            if segment is not None:
+                rows_by_day[active_day].append(segment)
     return tuple(EureciaDay(day, tuple(rows_by_day[day])) for day in days)
 
 
@@ -1273,9 +1271,27 @@ def _legacy_rows_by_day(
 
     grouped: dict[date, list[int]] = {day: [] for day in days}
     active_day: date | None = None
-    for row, controls in sorted(controls_by_row.items()):
-        row_text = _collapse(parser.row_text.get(controls[0].row_key, []))
-        active_day = _match_date(row_text, days) or active_day
+    for row, controls in controls_by_row.items():
+        # Dates in absence descriptions or comments do not identify the row's day.
+        first_control = controls[0]
+        row_key = first_control.row_key
+        header = _collapse(
+            part
+            for column in range(first_control.cell_key[2] if first_control.cell_key else 0)
+            for part in parser.cell_text.get((*row_key, column), [])
+        )
+        matched = _match_date(header, days)
+        if matched is None:
+            normalized = _normalize(header)
+            matched = next(
+                (
+                    day
+                    for day in days
+                    if re.search(rf"\b{_FRENCH_WEEKDAYS[day.weekday()]}\b", normalized)
+                ),
+                None,
+            )
+        active_day = matched or active_day
         if active_day is None:
             raise EureciaError(f"Cannot associate Eurecia row_{row} with a date")
         grouped[active_day].append(row)

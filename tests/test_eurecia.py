@@ -589,6 +589,81 @@ class EureciaTest(unittest.TestCase):
         self.assertEqual("09", payload[_legacy_field("endHour_Hours", 1)])
         self.assertEqual("18", payload[_legacy_field("endHour_Minutes", 1)])
 
+    def test_vacation_date_range_does_not_move_friday_rows_to_thursday(self) -> None:
+        days = iso_week_dates(2026, 44)
+        absence = "Congés payés du 29/10/2026 au 30/10/2026"
+        # Copied rows can have IDs that differ from their position in the form.
+        html = f"""
+        <form method="post" action="/eurecia/timesheet/Open.do">
+          <input id="validate" name="validate" value="">
+          <table>
+            <tr><td>Jeudi (00:00)</td>
+              <td><input id="standard_0" value="false"
+                name="{_legacy_field("standard", 0)}"></td>
+              <td><textarea name="{_legacy_field("comment", 0)}">{absence}</textarea></td>
+            </tr>
+            <tr><td></td><td>{_editable_row_selects(3, "12:36", "13:05")}</td></tr>
+            <tr><td>Vendredi (00:00)</td>
+              <td><input id="standard_1" value="false"
+                name="{_legacy_field("standard", 1)}"></td>
+              <td><textarea name="{_legacy_field("comment", 1)}">{absence}</textarea></td>
+            </tr>
+            <tr><td></td><td>{_editable_row_selects(2, "09:16", "10:07")}</td>
+              <td><textarea id="comment_2"
+                name="{_legacy_field("comment", 2)}">{absence}</textarea></td>
+            </tr>
+          </table>
+          <input type="submit" id="btnApply" value="Enregistrer">
+        </form>
+        """
+        parser = _parse_page(html)
+        form, controls = _find_timesheet_form(parser, days)
+
+        rows = _legacy_rows_by_day(parser, form, days)
+        current = _days_from_page(parser, form, days, controls)
+        targets = (
+            EureciaDay(days[3], (EureciaSegment("14:01", "15:09"),)),
+            EureciaDay(days[4], (EureciaSegment("13:58", "18:00"),)),
+        )
+        payload = dict(
+            _legacy_save_fields(form, _legacy_target_overrides(parser, form, days, targets))
+        )
+
+        self.assertEqual((0, 3), rows[days[3]])
+        self.assertEqual((1, 2), rows[days[4]])
+        self.assertEqual((EureciaSegment("12:36", "13:05"),), current[3].segments)
+        self.assertEqual((EureciaSegment("09:16", "10:07"),), current[4].segments)
+        self.assertEqual(absence, payload[_legacy_field("comment", 0)])
+        self.assertEqual(absence, payload[_legacy_field("comment", 1)])
+        self.assertEqual("14", payload[_legacy_field("startHour_Hours", 3)])
+        self.assertEqual("13", payload[_legacy_field("startHour_Hours", 2)])
+
+    def test_day_headers_follow_action_column_in_eurecia_layout(self) -> None:
+        days = iso_week_dates(2026, 44)
+        absence = "Congés payés 29/10/2026 09:00:00 - 30/10/2026 17:35:00"
+        rows = []
+        for row, (weekday, day) in enumerate(
+            zip(("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"), days[:5], strict=True)
+        ):
+            rows.append(f"""
+                <tr><td>Nouveau Supprimer</td>
+                  <td>{weekday} (00:00)</td><td>{day.strftime("%d/%m/%Y")}</td>
+                  <td><input id="standard_{row}" value="false"
+                    name="{_legacy_field("standard", row)}"></td>
+                  <td>{_editable_row_selects(row, "09:00", "12:00")}</td>
+                  <td><textarea name="{_legacy_field("comment", row)}">{absence}</textarea></td>
+                </tr>
+            """)
+        parser = _parse_page(f"<form><table>{''.join(rows)}</table></form>")
+        form, controls = _find_timesheet_form(parser, days)
+
+        grouped = _legacy_rows_by_day(parser, form, days)
+        current = _days_from_page(parser, form, days, controls)
+
+        for row, day in enumerate(days[:5]):
+            self.assertEqual((row,), grouped[day])
+            self.assertEqual((EureciaSegment("09:00", "12:00"),), current[row].segments)
+
     def test_standard_toggle_payload_uses_observed_load_time_action(self) -> None:
         parser = _parse_page(_STANDARD_TIMESHEET_HTML)
         days = iso_week_dates(2026, 23)

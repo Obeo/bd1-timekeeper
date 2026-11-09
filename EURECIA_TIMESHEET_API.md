@@ -435,6 +435,11 @@ BD-1 reparcourt le HTML après chaque action et vérifie que le nombre de lignes
 éditables a changé exactement de un. Les numéros de lignes sont toujours relus
 depuis la réponse ; ils ne sont pas déduits localement.
 
+L'association à une journée suit l'ordre des lignes du formulaire et le libellé
+des cellules d'en-tête précédant les contrôles (actions, jour, date). Les dates
+présentes dans les commentaires et descriptions d'absence ne servent pas à identifier la journée :
+un congé couvrant jeudi et vendredi peut rappeler ces deux dates sur chaque ligne.
+
 Une ligne sans les quatre sélecteurs horaires et dont le marqueur `standard_N`
 est faux est considérée comme synchronisée et verrouillée. C’est notamment le
 cas des lignes « Congés payés » et « Jour férié ». Ces lignes ne sont jamais

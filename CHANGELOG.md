@@ -11,6 +11,9 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+- Keep Eurecia rows associated with their day when absence descriptions contain
+  a date range, preserving synchronized vacation rows during work exports.
+
 ## 0.2.2 - 2026-09-18
 
 - Marshal macOS tray updates to the main thread for compatibility with macOS 27.
