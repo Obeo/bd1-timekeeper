@@ -17,6 +17,7 @@ from pathlib import Path
 from bd1.settings import (
     DEFAULT_VPN_INTERFACE_PATTERNS,
     DEFAULT_WEEKLY_CAP_HOURS,
+    DEFAULT_WEEKLY_TOP_UP_HOURS,
     Settings,
     load_settings,
     save_settings,
@@ -81,6 +82,43 @@ class SettingsTest(unittest.TestCase):
             loaded = load_settings(path)
 
         self.assertEqual(20, loaded.weekly_cap_hours)
+
+    def test_weekly_top_up_defaults_are_preserved_for_existing_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            path.write_text(json.dumps({"weekly_cap_hours": 20}), encoding="utf-8")
+
+            settings = load_settings(path)
+
+        self.assertFalse(settings.weekly_top_up_enabled)
+        self.assertEqual(37, DEFAULT_WEEKLY_TOP_UP_HOURS)
+        self.assertEqual(DEFAULT_WEEKLY_TOP_UP_HOURS, Settings().weekly_top_up_hours)
+        self.assertEqual(DEFAULT_WEEKLY_TOP_UP_HOURS, settings.weekly_top_up_hours)
+
+    def test_round_trips_weekly_top_up_independently_of_the_cap(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            save_settings(
+                Settings(weekly_top_up_enabled=True, weekly_top_up_hours=36, weekly_cap_hours=37),
+                path,
+            )
+
+            loaded = load_settings(path)
+
+        self.assertTrue(loaded.weekly_top_up_enabled)
+        self.assertEqual(36, loaded.weekly_top_up_hours)
+        self.assertEqual(37, loaded.weekly_cap_hours)
+
+    def test_invalid_weekly_top_up_hours_keeps_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "settings.json"
+            for value in (0, -1, True, "36", 36.5, None):
+                with self.subTest(value=value):
+                    path.write_text(json.dumps({"weekly_top_up_hours": value}), encoding="utf-8")
+
+                    settings = load_settings(path)
+
+                    self.assertEqual(DEFAULT_WEEKLY_TOP_UP_HOURS, settings.weekly_top_up_hours)
 
     def test_round_trips_eurecia_connection_without_a_password(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
