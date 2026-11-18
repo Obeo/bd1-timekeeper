@@ -17,17 +17,19 @@ import psutil
 
 from bd1.settings import DEFAULT_VPN_INTERFACE_PATTERNS
 
-INTRANET_HOSTNAME = "intranet.obeo.fr"
 INTRANET_PORT = 443
 OFFICE = "office"
 REMOTE = "remote"
 
 
-def network_status(hostname: str = INTRANET_HOSTNAME) -> dict[str, object]:
+def network_status(hostname: str) -> dict[str, object]:
+    hostname = hostname.strip()
     status: dict[str, object] = {
         "intranet_hostname": hostname,
         "intranet_resolved": False,
     }
+    if not hostname:
+        return status
     try:
         addresses = socket.getaddrinfo(hostname, INTRANET_PORT, type=socket.SOCK_STREAM)
     except OSError:

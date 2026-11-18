@@ -21,11 +21,19 @@ class NetworkStatusTest(unittest.TestCase):
         with patch("bd1.network.socket.getaddrinfo", side_effect=socket.gaierror):
             self.assertEqual(
                 {
-                    "intranet_hostname": "intranet.obeo.fr",
+                    "intranet_hostname": "intranet.example.com",
                     "intranet_resolved": False,
                 },
-                network_status(),
+                network_status("intranet.example.com"),
             )
+
+    def test_reports_remote_without_resolving_when_hostname_is_unset(self) -> None:
+        with patch("bd1.network.socket.getaddrinfo") as getaddrinfo:
+            self.assertEqual(
+                {"intranet_hostname": "", "intranet_resolved": False},
+                network_status("  "),
+            )
+        getaddrinfo.assert_not_called()
 
     def test_reports_selected_network_interface(self) -> None:
         connection = Mock()
@@ -44,7 +52,7 @@ class NetworkStatusTest(unittest.TestCase):
                 },
             ),
         ):
-            status = network_status()
+            status = network_status("intranet.example.com")
 
         self.assertTrue(status["intranet_resolved"])
         self.assertEqual("10.0.0.7", status["local_address"])
@@ -73,7 +81,7 @@ class NetworkStatusTest(unittest.TestCase):
                 return_value="TAP-Windows Adapter V9",
             ),
         ):
-            status = network_status()
+            status = network_status("intranet.example.com")
 
         self.assertEqual("TAP-Windows Adapter V9", status["network_interface_description"])
 

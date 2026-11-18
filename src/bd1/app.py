@@ -91,7 +91,7 @@ class BD1Application:
         signal.signal(signal.SIGINT, self._handle_signal)
 
         self._record_system_boot()
-        startup_network_status = network_status()
+        startup_network_status = network_status(self.settings.intranet_hostname)
         self.add_observation(
             ObservationType.APP_STARTED,
             metadata={"source": "app", **startup_network_status},
@@ -171,7 +171,7 @@ class BD1Application:
         self._mattermost_thread = None
         self._mattermost_last_location = None
         self._mattermost_last_date = None
-        self._start_mattermost_sync(network_status())
+        self._start_mattermost_sync(network_status(self.settings.intranet_hostname))
 
     def _record_app_stopped(self) -> None:
         try:
@@ -249,7 +249,7 @@ class BD1Application:
             self._sync_mattermost(current_network_status)
             if stop_event.wait(MATTERMOST_SYNC_INTERVAL_SECONDS):
                 return
-            current_network_status = network_status()
+            current_network_status = network_status(self.settings.intranet_hostname)
 
     def _sync_mattermost(self, current_network_status: dict[str, object]) -> None:
         location = work_location(

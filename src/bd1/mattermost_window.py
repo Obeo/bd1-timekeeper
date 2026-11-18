@@ -84,6 +84,7 @@ def configure_mattermost(
     server_url: str,
     token: str,
     vpn_patterns: str,
+    intranet_hostname: str | None = None,
 ) -> Settings:
     normalized_url = normalize_server_url(server_url)
     normalized_token = token.strip()
@@ -102,6 +103,8 @@ def configure_mattermost(
         mattermost_url=normalized_url,
         vpn_interface_patterns=patterns,
     )
+    if intranet_hostname is not None:
+        updated = replace(updated, intranet_hostname=intranet_hostname.strip())
     save_settings(updated)
     if settings.mattermost_url and settings.mattermost_url != normalized_url:
         with suppress(MattermostError):
@@ -164,6 +167,7 @@ class _MattermostWindowUI:
         server_var = tk.StringVar(value=self.settings.mattermost_url)
         token_var = tk.StringVar()
         patterns_var = tk.StringVar(value=", ".join(self.settings.vpn_interface_patterns))
+        intranet_var = tk.StringVar(value=self.settings.intranet_hostname)
 
         frame = ttk.Frame(root, padding=16)
         frame.grid(sticky="nsew")
@@ -196,11 +200,29 @@ class _MattermostWindowUI:
             row=6,
             column=0,
             sticky="ew",
-            pady=(3, 14),
+            pady=(3, 12),
+        )
+
+        ttk.Label(frame, text="Nom d'hôte intranet (détection du bureau)").grid(
+            row=7,
+            column=0,
+            sticky="w",
+        )
+        ttk.Entry(frame, textvariable=intranet_var, width=58).grid(
+            row=8,
+            column=0,
+            sticky="ew",
+            pady=(3, 2),
+        )
+        ttk.Label(frame, text="Laisser vide pour toujours indiquer le télétravail.").grid(
+            row=9,
+            column=0,
+            sticky="w",
+            pady=(0, 14),
         )
 
         buttons = ttk.Frame(frame)
-        buttons.grid(row=7, column=0, sticky="e")
+        buttons.grid(row=10, column=0, sticky="e")
 
         def save() -> None:
             try:
@@ -209,6 +231,7 @@ class _MattermostWindowUI:
                     server_var.get(),
                     token_var.get(),
                     patterns_var.get(),
+                    intranet_var.get(),
                 )
             except (MattermostError, ValueError) as error:
                 messagebox.showerror("BD-1", str(error), parent=root)
