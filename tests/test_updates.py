@@ -14,7 +14,7 @@ import unittest
 from importlib.metadata import PackageNotFoundError
 from unittest.mock import patch
 
-from bd1.updates import AvailableUpdate, find_update, installed_version
+from bd1.updates import AvailableUpdate, _is_release_download, find_update, installed_version
 
 
 class UpdateCheckTest(unittest.TestCase):
@@ -75,6 +75,16 @@ class UpdateCheckTest(unittest.TestCase):
         )
 
         self.assertIsNone(find_update("0.1.0", "linux"))
+
+    def test_accepts_downloads_from_previous_and_current_owners(self) -> None:
+        for owner in ("Obeo", "ObeoNetwork"):
+            url = f"https://github.com/{owner}/bd1-timekeeper/releases/download/v0.2.0/bd1.exe"
+            self.assertTrue(_is_release_download(url), owner)
+        self.assertFalse(
+            _is_release_download(
+                "https://github.com/someone/bd1-timekeeper/releases/download/v0.2.0/bd1.exe"
+            )
+        )
 
 
 def _response(payload: object) -> io.BytesIO:

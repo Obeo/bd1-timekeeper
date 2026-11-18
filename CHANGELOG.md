@@ -11,6 +11,16 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+## 0.2.4 - 2026-11-18
+
+- Accept update downloads from the ObeoNetwork organization so BD-1 keeps
+  finding updates once the repository moves there.
+- Configure the intranet hostname used for office detection with the
+  `intranet_hostname` setting or in the Mattermost integration window. It is
+  empty by default, in which case BD-1 always reports remote work: Obeo users
+  must set it to `intranet.obeo.fr` to keep office detection.
+- Remove internal documents from the repository.
+
 ## 0.2.3 - 2026-11-09
 
 - Keep Eurecia rows associated with their day when absence descriptions contain

@@ -18,6 +18,11 @@ from urllib.parse import urlsplit
 
 LOGGER = logging.getLogger(__name__)
 LATEST_RELEASE_URL = "https://api.github.com/repos/Obeo/bd1-timekeeper/releases/latest"
+# The repository is moving from Obeo to ObeoNetwork; accept release assets from both owners.
+RELEASE_DOWNLOAD_PATH_PREFIXES = (
+    "/obeo/bd1-timekeeper/releases/download/",
+    "/obeonetwork/bd1-timekeeper/releases/download/",
+)
 ASSET_NAMES = {
     "win32": "bd1-windows-x86_64.exe",
     "linux": "bd1-linux-x86_64.tar.gz",
@@ -92,5 +97,5 @@ def _is_release_download(value: object) -> bool:
     return (
         parsed.scheme == "https"
         and parsed.hostname == "github.com"
-        and parsed.path.startswith("/Obeo/bd1-timekeeper/releases/download/")
+        and parsed.path.casefold().startswith(RELEASE_DOWNLOAD_PATH_PREFIXES)
     )
