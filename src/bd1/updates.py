@@ -17,8 +17,8 @@ from importlib.metadata import PackageNotFoundError, version
 from urllib.parse import urlsplit
 
 LOGGER = logging.getLogger(__name__)
-LATEST_RELEASE_URL = "https://api.github.com/repos/Obeo/bd1-timekeeper/releases/latest"
-# The repository is moving from Obeo to ObeoNetwork; accept release assets from both owners.
+LATEST_RELEASE_URL = "https://api.github.com/repos/ObeoNetwork/bd1-timekeeper/releases/latest"
+# The repository moved from Obeo to ObeoNetwork; accept release assets from both owners.
 RELEASE_DOWNLOAD_PATH_PREFIXES = (
     "/obeo/bd1-timekeeper/releases/download/",
     "/obeonetwork/bd1-timekeeper/releases/download/",

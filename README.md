@@ -20,10 +20,10 @@ recomputes suggestions on demand.
 
 Installable builds are published with each stable release:
 
-<https://github.com/Obeo/bd1-timekeeper/releases/latest>
+<https://github.com/ObeoNetwork/bd1-timekeeper/releases/latest>
 
 Development builds remain available from the latest successful build of `master`:
-<https://github.com/Obeo/bd1-timekeeper/releases/tag/build/master>.
+<https://github.com/ObeoNetwork/bd1-timekeeper/releases/tag/build/master>.
 
 Download the asset matching your operating system:
 

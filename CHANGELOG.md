@@ -11,6 +11,12 @@ All notable changes to BD-1 are documented in this file.
 
 ## Unreleased
 
+## 0.2.5 - 2026-11-18
+
+- Move the project to the ObeoNetwork GitHub organization: update checks, the
+  Windows installer, and project links now use
+  `https://github.com/ObeoNetwork/bd1-timekeeper`.
+
 ## 0.2.4 - 2026-11-18
 
 - Accept update downloads from the ObeoNetwork organization so BD-1 keeps

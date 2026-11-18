@@ -34,7 +34,7 @@ class UpdateCheckTest(unittest.TestCase):
                 "assets": [
                     {
                         "name": "bd1-windows-x86_64.exe",
-                        "browser_download_url": "https://github.com/Obeo/bd1-timekeeper/releases/download/v0.2.0/bd1-windows-x86_64.exe",
+                        "browser_download_url": "https://github.com/ObeoNetwork/bd1-timekeeper/releases/download/v0.2.0/bd1-windows-x86_64.exe",
                     }
                 ],
             }
@@ -45,7 +45,7 @@ class UpdateCheckTest(unittest.TestCase):
         self.assertEqual(
             AvailableUpdate(
                 "0.2.0",
-                "https://github.com/Obeo/bd1-timekeeper/releases/download/v0.2.0/bd1-windows-x86_64.exe",
+                "https://github.com/ObeoNetwork/bd1-timekeeper/releases/download/v0.2.0/bd1-windows-x86_64.exe",
             ),
             update,
         )

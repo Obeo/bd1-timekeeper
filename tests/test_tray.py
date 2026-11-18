@@ -114,7 +114,7 @@ class TrayAppTest(unittest.TestCase):
                 )
                 tray.available_update = AvailableUpdate(
                     "0.2.0",
-                    "https://github.com/Obeo/bd1-timekeeper/releases/download/v0.2.0/bd1-linux-x86_64.tar.gz",
+                    "https://github.com/ObeoNetwork/bd1-timekeeper/releases/download/v0.2.0/bd1-linux-x86_64.tar.gz",
                 )
 
                 menu = tray._menu()
@@ -138,7 +138,7 @@ class TrayAppTest(unittest.TestCase):
     def test_update_check_refreshes_menu_and_notifies(self, find_update) -> None:
         find_update.return_value = AvailableUpdate(
             "0.2.0",
-            "https://github.com/Obeo/bd1-timekeeper/releases/download/v0.2.0/bd1-linux-x86_64.tar.gz",
+            "https://github.com/ObeoNetwork/bd1-timekeeper/releases/download/v0.2.0/bd1-linux-x86_64.tar.gz",
         )
         with tempfile.TemporaryDirectory() as tmp:
             store = ObservationStore(Path(tmp) / "bd1.db")
