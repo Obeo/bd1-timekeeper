@@ -57,9 +57,9 @@ bd1 = "bd1.__main__:main"
 bd1-eurecia = "bd1.eurecia:main"
 
 [project.urls]
-Homepage = "https://github.com/Obeo/bd1-timekeeper"
-Repository = "https://github.com/Obeo/bd1-timekeeper.git"
-Issues = "https://github.com/Obeo/bd1-timekeeper/issues"
+Homepage = "https://github.com/ObeoNetwork/bd1-timekeeper"
+Repository = "https://github.com/ObeoNetwork/bd1-timekeeper.git"
+Issues = "https://github.com/ObeoNetwork/bd1-timekeeper/issues"
 License = "https://www.eclipse.org/legal/epl-2.0/"
 
 [tool.setuptools.packages.find]
