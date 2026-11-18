@@ -49,6 +49,7 @@ class Settings:
     weekly_top_up_hours: int = DEFAULT_WEEKLY_TOP_UP_HOURS
     mattermost_url: str = ""
     vpn_interface_patterns: tuple[str, ...] = DEFAULT_VPN_INTERFACE_PATTERNS
+    intranet_hostname: str = ""
     eurecia_base_url: str = ""
     eurecia_email: str = ""
 
@@ -87,6 +88,10 @@ def load_settings(path: Path | None = None) -> Settings:
             data[key] = DEFAULT_VPN_INTERFACE_PATTERNS
     if not isinstance(data.get("mattermost_url", ""), str):
         data["mattermost_url"] = ""
+    intranet_hostname = data.get("intranet_hostname", "")
+    data["intranet_hostname"] = (
+        intranet_hostname.strip() if isinstance(intranet_hostname, str) else ""
+    )
     if "lunch_automatic_work_resume_time" in data:
         data["lunch_automatic_work_resume_time"] = normalize_lunch_automatic_work_resume_time(
             data["lunch_automatic_work_resume_time"],

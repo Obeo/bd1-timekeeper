@@ -167,6 +167,7 @@ class SettingsTest(unittest.TestCase):
                 Settings(
                     mattermost_url="https://mattermost.example.com",
                     vpn_interface_patterns=("tun*", "Corporate VPN"),
+                    intranet_hostname="intranet.example.com",
                 ),
                 path,
             )
@@ -175,18 +176,23 @@ class SettingsTest(unittest.TestCase):
 
         self.assertEqual("https://mattermost.example.com", settings.mattermost_url)
         self.assertEqual(("tun*", "Corporate VPN"), settings.vpn_interface_patterns)
+        self.assertEqual("intranet.example.com", settings.intranet_hostname)
 
     def test_invalid_mattermost_settings_keep_safe_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "settings.json"
             path.write_text(
-                json.dumps({"mattermost_url": 42, "vpn_interface_patterns": 42}),
+                json.dumps(
+                    {"mattermost_url": 42, "vpn_interface_patterns": 42, "intranet_hostname": 42}
+                ),
                 encoding="utf-8",
             )
 
             settings = load_settings(path)
 
         self.assertEqual("", settings.mattermost_url)
+        self.assertEqual("", settings.intranet_hostname)
+        self.assertEqual("", Settings().intranet_hostname)
         self.assertEqual(DEFAULT_VPN_INTERFACE_PATTERNS, settings.vpn_interface_patterns)
         self.assertEqual(DEFAULT_VPN_INTERFACE_PATTERNS, Settings().vpn_interface_patterns)
 

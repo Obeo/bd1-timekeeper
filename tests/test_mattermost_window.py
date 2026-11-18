@@ -35,9 +35,11 @@ class MattermostWindowConfigurationTest(unittest.TestCase):
                 " https://mattermost.example.com/ ",
                 " secret ",
                 "tun*, OpenVPN*, tun*",
+                " intranet.example.com ",
             )
 
         self.assertEqual("https://mattermost.example.com", updated.mattermost_url)
+        self.assertEqual("intranet.example.com", updated.intranet_hostname)
         self.assertEqual(("tun*", "OpenVPN*"), updated.vpn_interface_patterns)
         verify.assert_called_once_with("https://mattermost.example.com", "secret")
         store.assert_called_once_with("https://mattermost.example.com", "secret")

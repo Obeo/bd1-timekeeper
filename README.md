@@ -153,13 +153,17 @@ access token. You can also configure it from a terminal:
 bd1 --configure-mattermost
 ```
 
-The URL and VPN interface patterns are stored in `settings.json`; the token is
+The URL, VPN interface patterns, and intranet hostname are stored in
+`settings.json`; the token is
 stored in Windows Credential Manager, macOS Keychain, or the Linux Secret
 Service. Settings changed from the tray UI take effect immediately.
 
-BD-1 checks the network at startup and once per hour. A successful resolution of
-`intranet.obeo.fr` through a physical interface means office; a failed resolution
-or a route through OpenVPN means remote. Common `tun`, `tap`, `utun`, `ovpn`,
+BD-1 checks the network at startup and once per hour. Set the intranet hostname
+in the same window, or as `intranet_hostname` in `settings.json`, to a name that
+only resolves on your internal network. A successful resolution of that hostname
+through a physical interface means office; a failed resolution or a route through
+OpenVPN means remote. When no intranet hostname is set, BD-1 always reports remote.
+Common `tun`, `tap`, `utun`, `ovpn`,
 OpenVPN, and Wintun interface names are recognized. On Windows, BD-1 also checks
 the adapter description so localized or renamed connections keep their driver
 identity. Add other VPN interface names to `vpn_interface_patterns` in
@@ -294,9 +298,7 @@ ambiguous forms, non-`POST` saves, timesheets whose status cannot be established
 `Nouvelle`, and rows that cannot be mapped safely. It supports the observed Eurecia Keycloak
 password flow and importing an established browser session, but it does not automate MFA or
 additional identity-provider screens. This is an unsupported private interface whose HTML
-may change; see
-[EURECIA_TIMESHEET_API.md](EURECIA_TIMESHEET_API.md) for the observed contract and current
-limitations.
+may change.
 
 In the weekly report, **Pousser vers Eurecia** replaces editable rows on the displayed
 working days with the displayed BD-1 work segments. The 37-hour cap is therefore applied
